@@ -56,3 +56,13 @@ body{background:radial-gradient(60% 35% at 85% -5%,#22d3ee24,transparent),radial
 .vf{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--ac);color:#04262b;font-size:.7rem;font-weight:800;vertical-align:middle}
 .row{display:flex;flex-wrap:wrap;gap:8px}.row .btn{margin-top:8px;padding:8px 14px}
 .auth #side,.auth #scrim,.auth #top{display:none!important}.auth .main{margin-left:0}
+
+.chr{display:flex;gap:12px;align-items:center}.chr div{min-width:0}.chr small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chh{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.msgs{height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:4px 0 12px}
+.bub{align-self:flex-start;max-width:80%;background:var(--s2);border-radius:16px 16px 16px 4px;padding:8px 12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.bub.me{align-self:flex-end;background:#22d3ee33;border-radius:16px 16px 4px 16px}
+.bub small,.stm small{display:block;font-size:.7rem;color:var(--mu);text-align:right}
+.stm{align-self:flex-start;font-size:3.6rem;line-height:1.1}.stm.me{align-self:flex-end}
+.pan{display:flex;flex-wrap:wrap;gap:4px;max-height:160px;overflow:auto;background:var(--s2);border-radius:14px;padding:8px;margin-bottom:10px}
+.pan[hidden]{display:none}.pan button{font-size:1.5rem;padding:4px 6px;border-radius:8px}.pan .stk{font-size:2.4rem}.pan hr{flex-basis:100%;border:0;border-top:1px solid var(--bd)}
