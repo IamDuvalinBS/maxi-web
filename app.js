@@ -1,10 +1,10 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const NAV = [['inicio','🏠','Inicio','Menú'],['juegos','🎮','Juegos','Menú'],['pases','🏆','Pases','Menú'],['canjear','🎟️','Canjear','Menú'],['noticias','📰','Noticias','Social'],['perfil','👤','Mi perfil','Social']];
+const NAV = [['inicio','🏠','Inicio','Menú'],['juegos','🎮','Juegos','Menú'],['pases','🏆','Pases','Menú'],['canjear','🎟️','Canjear','Menú'],['chats','💬','Chats','Social'],['noticias','📰','Noticias','Social'],['perfil','👤','Mi perfil','Social']];
 let fb = null, db = null, user = null, perfil = null, ready = false, pendingName = '';
 try { if (window.firebase && C.firebase && C.firebase.apiKey) { firebase.initializeApp(C.firebase); fb = firebase.auth(); db = firebase.firestore(); } } catch (e) { fb = null; db = null; }
 
-const page = () => { const h = location.hash.slice(1); return NAV.some(n => n[0] === h) ? h : 'inicio'; };
+const page = () => { const h = location.hash.slice(1); return h.startsWith('chat/') ? 'chat' : NAV.some(n => n[0] === h) ? h : 'inicio'; };
 const nombre = () => (perfil && perfil.nombre) || (user && (user.displayName || (user.email || '').split('@')[0])) || '';
 const foto = () => (perfil && perfil.avatar) || (user && user.photoURL) || '';
 const avatar = px => `<span class="av" style="width:${px}px;height:${px}px;font-size:${px/2.5}px">${foto() ? `<img src="${esc(foto())}" alt="" referrerpolicy="no-referrer">` : esc((nombre() || '?')[0].toUpperCase())}</span>`;
@@ -55,6 +55,8 @@ const PAGES = {
     h += postsView();
     return h;
   },
+  chats: () => chatsView(),
+  chat: () => chatView(),
   juegos: () => `<section class="card"><div class="ti">🎮 Juegos</div>${empty('🕹️', 'No hay juegos agregados todavía. Espera a las próximas actualizaciones.')}</section>`,
   pases: () => `<section class="card"><div class="ti">🏆 Pases</div>${empty('🏆', 'No hay pases disponibles todavía. Espera a las próximas actualizaciones.')}</section>`,
   noticias: () => `<section class="card"><div class="ti">📰 Noticias</div>${empty('📰', 'No hay noticias por ahora. Vuelve pronto.')}</section>`,
@@ -80,7 +82,7 @@ async function loadPerfil() {
     const ref = db.collection('perfiles').doc(user.uid), d = await ref.get();
     if (d.exists) { perfil = d.data(); if (!perfil.idn) { perfil.idn = newId(); await ref.set({ idn: perfil.idn }, { merge: true }); } }
     else { perfil = { nombre: (pendingName || nombre()).slice(0, 20), idn: newId() }; await ref.set({ ...perfil, creado: firebase.firestore.FieldValue.serverTimestamp() }); }
-    await checkOwner(); render(); loadPosts();
+    await checkOwner(); render(); loadPosts(); loadChats();
   } catch (e) { toast(errMsg(e)); }
 }
 function setUser(u) { user = u || null; perfil = null; render(); if (user) setTimeout(loadPerfil, 0); }
@@ -138,4 +140,4 @@ document.addEventListener('change', e => {
   im.onerror = () => toast('No se pudo leer la imagen.');
   im.src = URL.createObjectURL(e.target.files[0]);
 });
-                                 
+                       
