@@ -1,12 +1,12 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const NAV = [['inicio','🏠','Inicio','Menú'],['juegos','🎮','Juegos','Menú'],['pases','🏆','Pases','Menú'],['canjear','🎟️','Canjear','Menú'],['noticias','📰','Noticias','Social'],['perfil','👤','Mi perfil','Social']];
-let sb = null, user = null, perfil = null;
-try { if (window.supabase && C.SUPABASE_URL && C.SUPABASE_KEY) sb = window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_KEY); } catch (e) { sb = null; }
+let fb = null, db = null, user = null, perfil = null;
+try { if (window.firebase && C.firebase && C.firebase.apiKey) { firebase.initializeApp(C.firebase); fb = firebase.auth(); db = firebase.firestore(); } } catch (e) { fb = null; db = null; }
 
 const page = () => { const h = location.hash.slice(1); return NAV.some(n => n[0] === h) ? h : 'inicio'; };
-const nombre = () => (perfil && perfil.nombre) || (user && ((user.user_metadata && user.user_metadata.full_name) || (user.email || '').split('@')[0])) || '';
-const foto = () => (user && user.user_metadata && (user.user_metadata.avatar_url || user.user_metadata.picture)) || '';
+const nombre = () => (perfil && perfil.nombre) || (user && (user.displayName || (user.email || '').split('@')[0])) || '';
+const foto = () => (user && user.photoURL) || '';
 const avatar = px => `<span class="av" style="width:${px}px;height:${px}px;font-size:${px/2.5}px">${foto() ? `<img src="${esc(foto())}" alt="" referrerpolicy="no-referrer">` : esc((nombre() || '?')[0].toUpperCase())}</span>`;
 const logo = () => `<span class="lg">${C.logo ? `<img src="${esc(C.logo)}" alt="">` : esc(C.nombre[0])}</span>`;
 const loginBtn = () => `<button class="btn" data-a="login"><span class="gg">G</span>Entrar con Google</button>`;
@@ -31,7 +31,7 @@ function renderTop() {
 const PAGES = {
   inicio() {
     let h = '';
-    if (!sb) h += `<section class="card note"><h2>Modo demo</h2><p class="mu">Falta conectar Supabase para que funcione el login con Google. Pega SUPABASE_URL y SUPABASE_KEY en el archivo.</p></section>`;
+    if (!fb) h += `<section class="card note"><h2>Modo demo</h2><p class="mu">Falta conectar Firebase para que funcione el login con Google. Pega tus claves en config.js.</p></section>`;
     h += user ? `<section class="card"><h2>Hola, ${esc(nombre())}</h2><p class="mu">Tu perfil se guarda en tu cuenta de Google.</p></section>` : gate('Entra con Google para guardar tu perfil.');
     h += `<div class="ti"><span class="ac">&lt;/&gt;</span>Creadores</div><div class="g2">` +
       C.creadores.map(c => `<div class="card cr"><div class="pic">${c.foto ? `<img src="${esc(c.foto)}" alt="" referrerpolicy="no-referrer">` : esc((c.nombre || '?')[0])}</div><b>${esc(c.nombre)}</b><br><small>${esc(c.rol)}</small></div>`).join('') + `</div>`;
@@ -48,19 +48,18 @@ const PAGES = {
 function render() { renderSide(); renderTop(); $('#view').innerHTML = PAGES[page()](); }
 
 async function loadPerfil() {
-  if (!sb || !user) return;
+  if (!db || !user) return;
   try {
-    const { data, error } = await sb.from('perfiles').select('nombre').eq('id', user.id).maybeSingle();
-    if (error) throw error;
-    if (data) { perfil = data; }
+    const ref = db.collection('perfiles').doc(user.uid);
+    const d = await ref.get();
+    if (d.exists) perfil = { nombre: d.data().nombre };
     else {
       const n = nombre();
-      const r = await sb.from('perfiles').upsert({ id: user.id, nombre: n, avatar: foto() || null });
-      if (r.error) throw r.error;
+      await ref.set({ nombre: n, avatar: foto() || null, creado: firebase.firestore.FieldValue.serverTimestamp() });
       perfil = { nombre: n };
     }
     render();
-  } catch (e) { toast('No se pudo cargar tu perfil: ' + (e.message || 'revisa la tabla "perfiles" en Supabase.')); }
+  } catch (e) { toast('No se pudo cargar tu perfil: ' + (e.message || 'revisa las reglas de Firestore.')); }
 }
 function setUser(u) { user = u || null; perfil = null; render(); if (user) setTimeout(loadPerfil, 0); }
 
@@ -77,19 +76,21 @@ document.addEventListener('click', async e => {
     d.dataset.theme = v; try { localStorage.setItem('tema', v); } catch (_) {}
   }
   else if (a === 'login') {
-    if (!sb) return toast('Falta configurar Supabase: pega SUPABASE_URL y SUPABASE_KEY en el archivo.');
-    const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
-    if (error) toast('No se pudo iniciar sesión: ' + error.message);
+    if (!fb) return toast('Falta configurar Firebase: pega tus claves en config.js.');
+    try { await fb.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+    catch (er) {
+      if (er.code === 'auth/popup-blocked' || er.code === 'auth/operation-not-supported-in-this-environment') fb.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+      else if (er.code !== 'auth/popup-closed-by-user' && er.code !== 'auth/cancelled-popup-request') toast('No se pudo iniciar sesión: ' + er.message);
+    }
   }
   else if (a === 'logout') {
-    const { error } = await sb.auth.signOut();
-    if (error) toast('No se pudo cerrar sesión: ' + error.message); else toast('Sesión cerrada');
+    try { await fb.signOut(); toast('Sesión cerrada'); } catch (er) { toast('No se pudo cerrar sesión: ' + er.message); }
   }
   else if (a === 'save') {
     const n = ($('#nom').value || '').trim().slice(0, 30);
     if (!n) return toast('Escribe un nombre.');
-    const { error } = await sb.from('perfiles').upsert({ id: user.id, nombre: n, avatar: foto() || null });
-    if (error) return toast('No se pudo guardar: ' + error.message);
+    try { await db.collection('perfiles').doc(user.uid).set({ nombre: n, avatar: foto() || null }, { merge: true }); }
+    catch (er) { return toast('No se pudo guardar: ' + er.message); }
     perfil = { nombre: n }; render(); toast('Cambios guardados');
   }
 });
@@ -98,7 +99,5 @@ window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); }
 
 try { const s = localStorage.getItem('tema'); if (s) document.documentElement.dataset.theme = s; } catch (_) {}
 render();
-if (sb) {
-  sb.auth.getSession().then(r => setUser(r.data && r.data.session ? r.data.session.user : null)).catch(() => {});
-  sb.auth.onAuthStateChange((ev, s) => { if (ev === 'SIGNED_IN' || ev === 'SIGNED_OUT') setUser(s ? s.user : null); });
-}
+if (fb) fb.onAuthStateChanged(u => setUser(u));
+  
