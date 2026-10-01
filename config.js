@@ -1,6 +1,6 @@
 // Edita solo este archivo para personalizar tu página
 const C = {
-  nombre: 'Maxi', sufijo: 'Bot', logo: '',
+  nombre: 'Mambo', sufijo: 'Bot', logo: '',
   // Firebase Console > Configuración del proyecto > Tus apps > Configuración del SDK
   firebase: {
     apiKey: 'AIzaSyAcS58AJUF-S3R2duqd8PycGFHWwjZYLng',
@@ -10,6 +10,7 @@ const C = {
   },
   creadores: [
     {nombre: 'Duvalin', rol: 'Creador', foto: ''},
-    {nombre: 'Maxi Bot', rol: 'Bot', foto: ''}
+    {nombre: 'Mambo Bot', rol: 'Bot', foto: ''}
   ]
 };
+const MODS = []; // módulos de la carpeta modulos/
