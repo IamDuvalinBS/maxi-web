@@ -1,6 +1,6 @@
 // Publicaciones y owners (verificados)
 let posts = [], owner = false;
-const vf = () => '<span class="vf" title="Verificado">✔</span>';
+const vf = () => '<img class="vf" src="img/verificado.png" alt="Verificado" title="Verificado">';
 async function checkOwner() { try { owner = (await db.collection('owners').doc(user.uid).get()).exists; } catch (e) { owner = false; } }
 async function loadPosts() {
   if (!db) return;
@@ -31,3 +31,4 @@ MODS.push(async (a, t) => {
   } catch (e) { toast(errMsg(e)); }
   return true;
 });
+        
