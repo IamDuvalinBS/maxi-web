@@ -90,6 +90,7 @@ const PAGES = {
 };
 function render() {
   document.body.classList.toggle('auth', !!fb && !user);
+  document.body.classList.toggle('inchat', page() === 'chat');
   if (fb && !user) { $('#view').innerHTML = ready ? authView() : ''; return; }
   renderSide(); renderTop(); $('#view').innerHTML = PAGES[page()]();
 }
@@ -161,4 +162,4 @@ document.addEventListener('change', e => {
   im.onerror = () => toast('No se pudo leer la imagen.');
   im.src = URL.createObjectURL(e.target.files[0]);
 });
-  
+    
