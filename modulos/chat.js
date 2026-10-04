@@ -39,7 +39,7 @@ function chatsView() {
 function chatView() {
   const p = perfs[location.hash.slice(6)];
   setTimeout(startChat, 0);
-  return `<section class="card"><div class="chh"><a href="#chats" class="ib" aria-label="Volver">←</a>${avOf(p || {}, 40)}<b>${esc((p && p.nombre) || 'Chat')}</b><button class="ib" data-a="tema" aria-label="Cambiar fondo del chat" style="margin-left:auto">🎨</button></div><div id="tm" class="tm" hidden>${Object.keys(TEMAS).map(k => `<button class="tmb" data-a="fondo" data-k="${k}" aria-label="Fondo ${k}" style="background:${TEMAS[k][0]};border-color:${TEMAS[k][1]}"></button>`).join('')}</div><div id="msgs" class="msgs"></div><div id="pan" class="pan" hidden>${EMO.map(e => `<button data-a="emo" data-e="${e}">${e}</button>`).join('')}<hr>${STK.map(e => `<button class="stk" data-a="stk" data-e="${e}">${e}</button>`).join('')}</div><div class="cmp"><button class="ib" data-a="pan" aria-label="Emojis y stickers">😊</button><input id="cm" maxlength="500" placeholder="Escribe un mensaje" aria-label="Mensaje"><button class="snd" data-a="send" aria-label="Enviar">➤</button></div></section>`;
+  return `<section class="card chatfull"><div class="chh"><a href="#chats" class="ib" aria-label="Volver">←</a>${avOf(p || {}, 40)}<b>${esc((p && p.nombre) || 'Chat')}</b><button class="ib" data-a="tema" aria-label="Cambiar fondo del chat" style="margin-left:auto">🎨</button></div><div id="tm" class="tm" hidden>${Object.keys(TEMAS).map(k => `<button class="tmb" data-a="fondo" data-k="${k}" aria-label="Fondo ${k}" style="background:${TEMAS[k][0]};border-color:${TEMAS[k][1]}"></button>`).join('')}</div><div id="msgs" class="msgs"></div><div id="pan" class="pan" hidden>${EMO.map(e => `<button data-a="emo" data-e="${e}">${e}</button>`).join('')}<hr>${STK.map(e => `<button class="stk" data-a="stk" data-e="${e}">${e}</button>`).join('')}</div><div class="cmp"><button class="ib" data-a="pan" aria-label="Emojis y stickers">😊</button><input id="cm" maxlength="500" placeholder="Escribe un mensaje" aria-label="Mensaje"><button class="snd" data-a="send" aria-label="Enviar">➤</button></div></section>`;
 }
 async function startChat() {
   const o = location.hash.slice(6); if (!db || !user || !o) return;
@@ -93,3 +93,4 @@ MODS.push(async (a, t) => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'cm') { e.preventDefault(); document.querySelector('[data-a=send]').click(); } });
 window.addEventListener('hashchange', () => { if (!location.hash.startsWith('#chat/') && unsub) { unsub(); unsub = null; } });
+    
