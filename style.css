@@ -23,7 +23,7 @@ header b,.sh b{font-size:1.2rem}header .sp{flex:1}
 .nv{display:flex;width:calc(100% - 24px);margin:2px 12px;gap:12px;align-items:center;padding:12px;border-radius:12px;color:var(--mu);border:1px solid transparent;text-align:left}
 .nv.on{background:#3b82f622;color:var(--ac);border-color:#3b82f644}
 .fl{margin-top:auto;padding-top:12px}
-@media(min-width:900px){#side{transform:none}.main{margin-left:280px}#scrim{display:none!important}#burger,.x{display:none}}
+
 @media(prefers-reduced-motion:reduce){#side{transition:none}}
 .view{max-width:760px;margin:0 auto;padding:16px;display:grid;gap:16px}
 .card{background:var(--s1);border:1px solid var(--bd);border-radius:20px;padding:20px}
@@ -90,4 +90,12 @@ body{background:radial-gradient(60% 35% at 85% -5%,#22d3ee24,transparent),radial
 .bub.me{background:var(--mine,#22d3ee);color:#07131a}.bub.me small{color:#07131aaa}
 .tm{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}.tm[hidden]{display:none}
 .tmb{width:36px;height:36px;border-radius:50%;border:3px solid var(--bd)}
-      
+
+html{touch-action:pan-y;overscroll-behavior-x:none;-webkit-text-size-adjust:100%;background:#05070a}
+body{max-width:520px;margin:0 auto;overflow-x:hidden;min-height:100dvh}
+.inchat{overflow:hidden}
+#side{left:max(0px,calc(50% - 260px));visibility:hidden;transition:transform .2s,visibility 0s .2s}
+.menu #side{visibility:visible;transition:transform .2s}
+.chatfull{position:fixed;top:0;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;z-index:30;border-radius:0;border:0;display:flex;flex-direction:column;padding:12px;margin:0;background:var(--bg);box-shadow:none}
+.chatfull .msgs{flex:1;height:auto;min-height:0}
+@media(prefers-reduced-motion:reduce){#side{transition:none}}
