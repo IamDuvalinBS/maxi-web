@@ -50,6 +50,7 @@ async function startChat() {
 function draw() {
   const el = $('#msgs'); if (!el) return;
   aplicarFondo();
+  if (!el._ro && window.ResizeObserver) { el._ro = new ResizeObserver(() => { el.scrollTop = el.scrollHeight; }); el._ro.observe(el); }
   el.innerHTML = msgs.length ? msgs.map(m => {
     const h = m.t && m.t.toDate ? m.t.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '', me = m.de === user.uid ? ' me' : '';
     return `<div class="${m.tp === 's' ? 'stm' : 'bub'}${me}">${esc(m.tx)}<small>${h}</small></div>`;
@@ -93,4 +94,3 @@ MODS.push(async (a, t) => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'cm') { e.preventDefault(); document.querySelector('[data-a=send]').click(); } });
 window.addEventListener('hashchange', () => { if (!location.hash.startsWith('#chat/') && unsub) { unsub(); unsub = null; } });
-    
