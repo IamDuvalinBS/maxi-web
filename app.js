@@ -1,14 +1,14 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const NAV = [['inicio','🏠','Inicio','Menú'],['juegos','🎮','Juegos','Menú'],['pases','🏆','Pases','Menú'],['canjear','🎟️','Canjear','Menú'],['chats','💬','Chats','Social'],['noticias','📰','Noticias','Social'],['perfil','👤','Mi perfil','Social']];
-let fb = null, db = null, user = null, perfil = null, ready = false, pendingName = '';
+let fb = null, db = null, user = null, perfil = null, ready = false, pendingName = '', authMode = 'in';
 try { if (window.firebase && C.firebase && C.firebase.apiKey) { firebase.initializeApp(C.firebase); fb = firebase.auth(); db = firebase.firestore(); } } catch (e) { fb = null; db = null; }
 
 const page = () => { const h = location.hash.slice(1); return h.startsWith('chat/') ? 'chat' : NAV.some(n => n[0] === h) ? h : 'inicio'; };
 const nombre = () => (perfil && perfil.nombre) || (user && (user.displayName || (user.email || '').split('@')[0])) || '';
 const foto = () => (perfil && perfil.avatar) || (user && user.photoURL) || '';
 const avatar = px => `<span class="av" style="width:${px}px;height:${px}px;font-size:${px/2.5}px">${foto() ? `<img src="${esc(foto())}" alt="" referrerpolicy="no-referrer">` : esc((nombre() || '?')[0].toUpperCase())}</span>`;
-const logo = () => `<span class="lg">${C.logo ? `<img src="${esc(C.logo)}" alt="">` : esc(C.nombre[0])}</span>`;
+const logo = px => `<span class="lg"${px ? ` style="width:${px}px;height:${px}px"` : ''}>${C.logo ? `<img src="${esc(C.logo)}" alt="">` : esc(C.nombre[0])}</span>`;
 const loginBtn = () => `<button class="btn" data-a="login"><span class="gg">G</span>Entrar con Google</button>`;
 const empty = (icon, t) => `<div class="em"><div style="font-size:2rem">${icon}</div><p>${t}</p></div>`;
 const gate = t => `<section class="card"><h2>Inicia sesión</h2><p class="mu">${t}</p>${loginBtn()}</section>`;
@@ -16,19 +16,33 @@ const gate = t => `<section class="card"><h2>Inicia sesión</h2><p class="mu">${
 const brand = () => `<span class="nm">${esc(C.nombre)}</span> <span class="sf">${esc(C.sufijo)}</span>`;
 const ERR = { 'auth/invalid-credential': 'Correo o contraseña incorrectos.', 'auth/wrong-password': 'Correo o contraseña incorrectos.', 'auth/user-not-found': 'Correo o contraseña incorrectos.', 'auth/email-already-in-use': 'Ese correo ya tiene cuenta. Toca Entrar.', 'auth/weak-password': 'La contraseña debe tener 6 caracteres o más.', 'auth/invalid-email': 'Correo no válido.', 'auth/operation-not-allowed': 'Este método no está activado en Firebase.', 'permission-denied': 'No tienes permiso para hacer esto.' };
 const errMsg = e => ERR[e.code] || ('Error: ' + (e.message || e));
-const authView = () => `<section class="card pf" style="margin-top:6vh"><div class="ti">${logo()}<span>${brand()}</span></div>
-  <p class="mu">Crea tu cuenta o entra. Solo lo haces una vez en este dispositivo.</p>${loginBtn()}
-  <p class="mu">o con tu correo</p>
-  <input id="em" type="email" placeholder="Correo" autocomplete="email" aria-label="Correo">
-  <input id="pw" type="password" placeholder="Contraseña (mínimo 6)" autocomplete="current-password" aria-label="Contraseña">
-  <input id="us" maxlength="20" placeholder="Usuario (solo para crear cuenta)" aria-label="Usuario">
-  <div class="row"><button class="btn" data-a="mail-in">Entrar</button><button class="btn sec" data-a="mail-up">Crear cuenta</button></div></section>`;
+const field = (ic, lb, id, ty, ph) => `<label class="fl2" for="${id}"><span>${ic}</span> ${lb}</label><input id="${id}" type="${ty}" placeholder="${ph}">`;
+const authView = () => { const up = authMode === 'up'; return `<section class="auth-card"><div class="alogo">${logo(84)}</div>
+  <h1>${up ? 'Crear cuenta' : 'Iniciar sesión'}</h1><p class="mu" style="text-align:center">${up ? 'Regístrate para entrar a ' + brand() : 'Accede a tu cuenta de ' + brand()}</p>
+  ${up ? field('👤', 'Nombre de usuario', 'us', 'text', 'tu_usuario') : ''}${field('✉️', 'Correo', 'em', 'email', 'tu@correo.com')}${field('🔒', 'Contraseña', 'pw', 'password', 'Mínimo 6 caracteres')}${up ? field('✅', 'Confirmar contraseña', 'pw2', 'password', 'Repite la contraseña') : ''}
+  <p id="am" class="am" role="alert"></p>
+  <button class="btn big" data-a="${up ? 'mail-up' : 'mail-in'}">${up ? '🚀 Crear cuenta' : 'Iniciar sesión'}</button>
+  ${up ? '' : '<p style="text-align:center"><button class="lnk" data-a="reset">¿Olvidaste tu contraseña?</button></p>'}
+  <div class="or"><span>${up ? 'O regístrate con' : 'O continúa con'}</span></div>
+  <button class="btn sec big" data-a="login"><span class="gg">G</span>Google</button>
+  <p class="mu sw">${up ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?'} <button class="lnk" data-a="mode">${up ? 'Iniciar sesión' : 'Crear cuenta'}</button></p></section>`; };
 async function mailAuth(nuevo) {
-  const em = ($('#em').value || '').trim(), pw = $('#pw').value || '', us = ($('#us').value || '').trim().slice(0, 20);
-  if (!em || !pw) return toast('Escribe tu correo y contraseña.');
-  if (nuevo && !us) return toast('Escribe un nombre de usuario para crear tu cuenta.');
+  const g = id => ($(id) ? $(id).value : ''), em = g('#em').trim(), pw = g('#pw'), us = g('#us').trim().slice(0, 20), am = $('#am');
+  const fail = m => { if (am) am.textContent = m; toast(m); };
+  if (am) am.textContent = '';
+  if (!em || !pw) return fail('Escribe tu correo y contraseña.');
+  if (nuevo) {
+    if (!us) return fail('Escribe un nombre de usuario.');
+    if (pw.length < 6) return fail('La contraseña debe tener 6 caracteres o más.');
+    if (pw !== g('#pw2')) return fail('Las contraseñas no coinciden.');
+  }
   try { if (nuevo) { pendingName = us; await fb.createUserWithEmailAndPassword(em, pw); } else await fb.signInWithEmailAndPassword(em, pw); }
-  catch (er) { toast(errMsg(er)); }
+  catch (er) { fail(errMsg(er)); }
+}
+async function resetPw() {
+  const em = ($('#em').value || '').trim();
+  if (!em) return toast('Escribe tu correo arriba y vuelve a tocar.');
+  try { await fb.sendPasswordResetEmail(em); toast('Te enviamos un correo para cambiar tu contraseña.'); } catch (er) { toast(errMsg(er)); }
 }
 function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 3500); }
 
@@ -108,6 +122,8 @@ document.addEventListener('click', async e => {
       else if (er.code !== 'auth/popup-closed-by-user' && er.code !== 'auth/cancelled-popup-request') toast('No se pudo iniciar sesión: ' + er.message);
     }
   }
+  else if (a === 'mode') { authMode = authMode === 'in' ? 'up' : 'in'; render(); }
+  else if (a === 'reset') await resetPw();
   else if (a === 'mail-in' || a === 'mail-up') await mailAuth(a === 'mail-up');
   else if (a === 'logout') {
     try { await fb.signOut(); toast('Sesión cerrada'); } catch (er) { toast('No se pudo cerrar sesión: ' + er.message); }
@@ -140,4 +156,4 @@ document.addEventListener('change', e => {
   im.onerror = () => toast('No se pudo leer la imagen.');
   im.src = URL.createObjectURL(e.target.files[0]);
 });
-                       
+  
