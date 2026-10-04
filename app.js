@@ -9,7 +9,7 @@ const nombre = () => (perfil && perfil.nombre) || (user && (user.displayName || 
 const foto = () => (perfil && perfil.avatar) || (user && user.photoURL) || '';
 const avatar = px => `<span class="av" style="width:${px}px;height:${px}px;font-size:${px/2.5}px">${foto() ? `<img src="${esc(foto())}" alt="" referrerpolicy="no-referrer">` : esc((nombre() || '?')[0].toUpperCase())}</span>`;
 const logo = px => `<span class="lg"${px ? ` style="width:${px}px;height:${px}px"` : ''}>${C.logo ? `<img src="${esc(C.logo)}" alt="">` : esc(C.nombre[0])}</span>`;
-const loginBtn = () => `<button class="btn" data-a="login"><span class="gg">G</span>Entrar con Google</button>`;
+const loginBtn = () => `<button class="btn" data-a="login"><img class="gimg" src="img/google.png" alt="" width="20" height="20">Entrar con Google</button>`;
 const empty = (icon, t) => `<div class="em"><div style="font-size:2rem">${icon}</div><p>${t}</p></div>`;
 const gate = t => `<section class="card"><h2>Inicia sesión</h2><p class="mu">${t}</p>${loginBtn()}</section>`;
 
@@ -24,7 +24,7 @@ const authView = () => { const up = authMode === 'up'; return `<section class="a
   <button class="btn big" data-a="${up ? 'mail-up' : 'mail-in'}">${up ? '🚀 Crear cuenta' : 'Iniciar sesión'}</button>
   ${up ? '' : '<p style="text-align:center"><button class="lnk" data-a="reset">¿Olvidaste tu contraseña?</button></p>'}
   <div class="or"><span>${up ? 'O regístrate con' : 'O continúa con'}</span></div>
-  <button class="btn sec big" data-a="login"><span class="gg">G</span>Google</button>
+  <button class="btn sec big" data-a="login"><img class="gimg" src="img/google.png" alt="" width="20" height="20">Google</button>
   <p class="mu sw">${up ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?'} <button class="lnk" data-a="mode">${up ? 'Iniciar sesión' : 'Crear cuenta'}</button></p></section>`; };
 async function mailAuth(nuevo) {
   const g = id => ($(id) ? $(id).value : ''), em = g('#em').trim(), pw = g('#pw'), us = g('#us').trim().slice(0, 20), am = $('#am');
@@ -36,13 +36,18 @@ async function mailAuth(nuevo) {
     if (pw.length < 6) return fail('La contraseña debe tener 6 caracteres o más.');
     if (pw !== g('#pw2')) return fail('Las contraseñas no coinciden.');
   }
-  try { if (nuevo) { pendingName = us; await fb.createUserWithEmailAndPassword(em, pw); } else await fb.signInWithEmailAndPassword(em, pw); }
+  try {
+    if (nuevo) {
+      pendingName = us; const r = await fb.createUserWithEmailAndPassword(em, pw);
+      try { await r.user.sendEmailVerification(); toast('Cuenta creada. Te enviamos un correo de verificación (revisa también spam).'); } catch (_) {}
+    } else await fb.signInWithEmailAndPassword(em, pw);
+  }
   catch (er) { fail(errMsg(er)); }
 }
 async function resetPw() {
   const em = ($('#em').value || '').trim();
   if (!em) return toast('Escribe tu correo arriba y vuelve a tocar.');
-  try { await fb.sendPasswordResetEmail(em); toast('Te enviamos un correo para cambiar tu contraseña.'); } catch (er) { toast(errMsg(er)); }
+  try { await fb.sendPasswordResetEmail(em); toast('Si ese correo tiene una cuenta con contraseña, te llegará un mensaje. Revisa también spam.'); } catch (er) { toast(errMsg(er)); }
 }
 function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 3500); }
 
