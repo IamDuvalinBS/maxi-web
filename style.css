@@ -79,3 +79,15 @@ body{background:radial-gradient(60% 35% at 85% -5%,#22d3ee24,transparent),radial
 .lnk{color:var(--ac);font-weight:600;padding:6px}
 .or{display:flex;align-items:center;gap:10px;color:var(--mu);margin:18px 0 4px}.or::before,.or::after{content:'';flex:1;height:1px;background:var(--bd)}
 .sw{text-align:center;margin-top:16px}
+
+.view{grid-template-columns:minmax(0,1fr)}
+.cmp input{width:0}
+.gimg{width:20px;height:20px;flex:none}
+.auth-card .btn.sec{background:#fff;color:#1f1f1f;border:1px solid #dadce0}
+.msgs{border-radius:16px;padding:12px;background:#0f131c;color:#e8ecf4}
+.bub{background:#10151fcc}
+.bub small,.stm small{color:#9aa4b8}
+.bub.me{background:var(--mine,#22d3ee);color:#07131a}.bub.me small{color:#07131aaa}
+.tm{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}.tm[hidden]{display:none}
+.tmb{width:36px;height:36px;border-radius:50%;border:3px solid var(--bd)}
+      
