@@ -1,6 +1,6 @@
 // Edita solo este archivo para personalizar tu página
 const C = {
-  nombre: 'Mambo', sufijo: 'Bot', logo: '',
+  nombre: 'Mambo', sufijo: 'Bot', logo: 'img/logo.jpg',
   // Firebase Console > Configuración del proyecto > Tus apps > Configuración del SDK
   firebase: {
     apiKey: 'AIzaSyAcS58AJUF-S3R2duqd8PycGFHWwjZYLng',
