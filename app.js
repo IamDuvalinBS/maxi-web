@@ -80,7 +80,7 @@ const PAGES = {
   juego: () => juegoView(),
   pases: () => `<section class="card"><div class="ti">🏆 Pases</div>${empty('🏆', 'No hay pases disponibles todavía. Espera a las próximas actualizaciones.')}</section>`,
   noticias: () => `<section class="card"><div class="ti">📰 Noticias</div>${empty('📰', 'No hay noticias por ahora. Vuelve pronto.')}</section>`,
-  canjear: () => user ? `<section class="card"><div class="ti">🎟️ Canjear</div>${empty('🎟️', 'No tienes recompensas por canjear todavía.')}</section>` : gate('Entra con Google para ver tus códigos de canje.'),
+  canjear: () => user ? `<section class="card"><div class="ti">🎟️ Canjear</div>${empty('🎟️', 'No tienes recompensas por canjear todavía.')}</section>${anunciosView()}` : gate('Entra con Google para ver tus códigos de canje.'),
   perfil: () => `<section class="card pf"><div class="ti">${avatar(64)}<span>${esc(nombre())} ${owner ? vf() : ''}</span></div>
     <p class="mu">${esc(user.email || '')}</p>
     <p>ID: <b>${esc((perfil && perfil.idn) || '…')}</b></p>
@@ -164,4 +164,4 @@ document.addEventListener('change', e => {
   im.onerror = () => toast('No se pudo leer la imagen.');
   im.src = URL.createObjectURL(e.target.files[0]);
 });
-  
+    
