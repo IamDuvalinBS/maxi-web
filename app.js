@@ -4,7 +4,7 @@ const NAV = [['inicio','🏠','Inicio','Menú'],['juegos','🎮','Juegos','Menú
 let fb = null, db = null, user = null, perfil = null, ready = false, pendingName = '', authMode = 'in';
 try { if (window.firebase && C.firebase && C.firebase.apiKey) { firebase.initializeApp(C.firebase); fb = firebase.auth(); db = firebase.firestore(); } } catch (e) { fb = null; db = null; }
 
-const page = () => { const h = location.hash.slice(1); return h.startsWith('chat/') ? 'chat' : NAV.some(n => n[0] === h) ? h : 'inicio'; };
+const page = () => { const h = location.hash.slice(1); return h.startsWith('chat/') ? 'chat' : h.startsWith('juego/') ? 'juego' : NAV.some(n => n[0] === h) ? h : 'inicio'; };
 const nombre = () => (perfil && perfil.nombre) || (user && (user.displayName || (user.email || '').split('@')[0])) || '';
 const foto = () => (perfil && perfil.avatar) || (user && user.photoURL) || '';
 const avatar = px => `<span class="av" style="width:${px}px;height:${px}px;font-size:${px/2.5}px">${foto() ? `<img src="${esc(foto())}" alt="" referrerpolicy="no-referrer">` : esc((nombre() || '?')[0].toUpperCase())}</span>`;
@@ -76,7 +76,8 @@ const PAGES = {
   },
   chats: () => chatsView(),
   chat: () => chatView(),
-  juegos: () => `<section class="card"><div class="ti">🎮 Juegos</div>${empty('🕹️', 'No hay juegos agregados todavía. Espera a las próximas actualizaciones.')}</section>`,
+  juegos: () => juegosView(),
+  juego: () => juegoView(),
   pases: () => `<section class="card"><div class="ti">🏆 Pases</div>${empty('🏆', 'No hay pases disponibles todavía. Espera a las próximas actualizaciones.')}</section>`,
   noticias: () => `<section class="card"><div class="ti">📰 Noticias</div>${empty('📰', 'No hay noticias por ahora. Vuelve pronto.')}</section>`,
   canjear: () => user ? `<section class="card"><div class="ti">🎟️ Canjear</div>${empty('🎟️', 'No tienes recompensas por canjear todavía.')}</section>` : gate('Entra con Google para ver tus códigos de canje.'),
@@ -90,7 +91,8 @@ const PAGES = {
 };
 function render() {
   document.body.classList.toggle('auth', !!fb && !user);
-  document.body.classList.toggle('inchat', page() === 'chat');
+  document.body.classList.toggle('inchat', ['chat', 'juego'].includes(page()));
+  if (page() === 'juego' && window.JUEGO_ACTIVO === location.hash && $('#jg')) return;
   if (fb && !user) { $('#view').innerHTML = ready ? authView() : ''; return; }
   renderSide(); renderTop(); $('#view').innerHTML = PAGES[page()]();
 }
@@ -162,4 +164,4 @@ document.addEventListener('change', e => {
   im.onerror = () => toast('No se pudo leer la imagen.');
   im.src = URL.createObjectURL(e.target.files[0]);
 });
-    
+  
