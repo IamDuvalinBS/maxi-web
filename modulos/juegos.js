@@ -82,7 +82,11 @@ function stopJuego() { if (J.stop) J.stop(); J.stop = null; window.JUEGO_ACTIVO 
 function startJuego() {
   const id = location.hash.slice(7), g = JG[id], a = $('#ja'); if (!g || !a) return;
   stopJuego(); J.id = id; window.JUEGO_ACTIVO = location.hash; $('#jo').hidden = true;
-  J.stop = g.f(a, terminar);
+  try {
+    if (g.bot && typeof BOT === 'undefined') throw new Error('No cargó modulos/juegos-bot.js. Revisa que esté subido dentro de la carpeta modulos.');
+    if (g.bot && !BOT[id]) throw new Error('Este juego no está en modulos/juegos-bot.js. Sube la versión nueva de ese archivo.');
+    J.stop = g.f(a, terminar);
+  } catch (e) { a.innerHTML = `<div class="card" style="margin:16px"><h2>No se pudo abrir el juego</h2><p class="mu">${esc(e.message)}</p></div>`; }
 }
 async function guardar(id, score, sumar) {
   const j = { ...(perfil && perfil.juegos) }, p = j[id] || {};
@@ -109,3 +113,4 @@ MODS.push(async a => {
   return false;
 });
 window.addEventListener('hashchange', stopJuego);
+                        
