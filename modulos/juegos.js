@@ -10,13 +10,11 @@ function tono(f, d, tipo, v) {
     o.connect(g); g.connect(AC.destination); o.start(); o.stop(t + d);
   } catch (e) {}
 }
-// Sonido genérico dentro de los juegos del bot (toque + botón de silencio)
-const SND_JS = "var on=window.__SND,A=null;function tk(){if(!on)return;try{A=A||new(window.AudioContext||window.webkitAudioContext)();var o=A.createOscillator(),g=A.createGain(),t=A.currentTime;o.type='triangle';o.frequency.value=480+Math.random()*200;g.gain.setValueAtTime(.05,t);g.gain.exponentialRampToValueAtTime(.001,t+.07);o.connect(g);g.connect(A.destination);o.start();o.stop(t+.07)}catch(e){}}addEventListener('pointerdown',tk,true);addEventListener('message',function(e){if(e.data&&'mpSnd' in e.data)on=!!e.data.mpSnd});";
 function botGame(id) {
   return a => {
     const f = document.createElement('iframe');
-    f.className = 'gf'; f.title = JG[id].n; f.setAttribute('sandbox', 'allow-scripts');
-    f.srcdoc = BOT[id].replace('<head>', `<head><script>window.__BEST=${miJuego(id).mejor || 0};window.__SND=${SND};${SND_JS}<\/script>`);
+    f.className = 'gf'; f.title = JG[id].n; f.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+    f.srcdoc = BOT[id].replace('<head>', `<head><script>window.__BEST=${miJuego(id).mejor || 0};<\/script>`);
     a.innerHTML = ''; a.appendChild(f); J.frame = f;
     const on = e => { if (e.source === f.contentWindow && e.data && e.data.mp) guardar(id, +e.data.best || 0, false); };
     window.addEventListener('message', on);
@@ -62,6 +60,9 @@ const JG = {
   colorrush: { n: 'Color Rush', ic: '🎨', d: 'Toca el color correcto antes de que se acabe el tiempo.', f: botGame('colorrush'), bot: 1 },
   dino: { n: 'Dino', ic: '🦖', d: 'Salta los cactus y esquiva los pájaros.', f: botGame('dino'), bot: 1 },
   snake: { n: 'Snake Fruits', ic: '🐍', d: 'Come frutas y crece sin chocar. Varios modos.', f: botGame('snake'), bot: 1 },
+  gusanos: { n: 'Gusanos Neón', ic: '🐛', d: 'Come puntos, crece y haz que los demás choquen contigo.', f: botGame('gusanos'), bot: 1 },
+  minigolf: { n: 'Mini Golf', ic: '⛳', d: '18 hoyos: mete la bola con los menos golpes posibles (el récord es el menor).', f: botGame('minigolf'), bot: 1, menor: 1 },
+  pou: { n: 'Pou Penales', ic: '⚽', d: 'Patea penales, suma puntos y cuida tus vidas.', f: botGame('pou'), bot: 1 },
   dodge: { n: 'Neon Dodge', ic: '🚀', d: 'Esquiva meteoros de neón y junta orbes.', f: botGame('dodge'), bot: 1 },
   simon: { n: 'Simón', ic: '🧠', d: 'Memoriza y repite la secuencia de colores.', f: simon },
   tap: { n: 'Tap Veloz', ic: '⚡', d: 'Toca lo más rápido que puedas en 10 segundos.', f: tapVeloz }
@@ -75,7 +76,7 @@ function juegoView() {
   const k = location.hash.slice(7), g = JG[k];
   if (!g) return `<section class="card">${empty('🎮', 'Ese juego no existe.')}</section>`;
   setTimeout(startJuego, 0);
-  return `<section class="card gamefull" id="jg"><div class="chh"><a href="#juegos" class="ib" aria-label="Volver">←</a><b>${g.ic} ${g.n}</b><span class="mu" style="margin-left:auto">Mejor: <b id="jb">${miJuego(k).mejor || 0}</b></span><button class="ib" data-a="snd" id="sb" aria-label="Sonido">${SND ? '🔊' : '🔇'}</button></div><div id="ja" class="ja${g.bot ? ' gfw' : ''}"></div><div id="jo" class="jo" hidden><div class="card"><h2 id="jt"></h2><p id="jx"></p><button class="btn" data-a="jrep">▶ Jugar de nuevo</button> <a class="btn sec" href="#juegos">Salir</a></div></div></section>`;
+  return `<section class="card gamefull" id="jg"><div class="chh"><a href="#juegos" class="ib" aria-label="Volver">←</a><b>${g.ic} ${g.n}</b><span class="mu" style="margin-left:auto">Mejor: <b id="jb">${miJuego(k).mejor || 0}</b></span>${g.bot ? '' : `<button class="ib" data-a="snd" id="sb" aria-label="Sonido">${SND ? '🔊' : '🔇'}</button>`}</div><div id="ja" class="ja${g.bot ? ' gfw' : ''}"></div><div id="jo" class="jo" hidden><div class="card"><h2 id="jt"></h2><p id="jx"></p><button class="btn" data-a="jrep">▶ Jugar de nuevo</button> <a class="btn sec" href="#juegos">Salir</a></div></div></section>`;
 }
 function stopJuego() { if (J.stop) J.stop(); J.stop = null; window.JUEGO_ACTIVO = null; }
 function startJuego() {
@@ -85,8 +86,9 @@ function startJuego() {
 }
 async function guardar(id, score, sumar) {
   const j = { ...(perfil && perfil.juegos) }, p = j[id] || {};
-  if (!sumar && score <= (p.mejor || 0)) return;
-  j[id] = { mejor: Math.max(p.mejor || 0, score), partidas: (p.partidas || 0) + (sumar ? 1 : 0) };
+  const menor = JG[id] && JG[id].menor, ant = p.mejor || 0;
+  if (!sumar && ant && (menor ? score >= ant : score <= ant)) return;
+  j[id] = { mejor: menor ? (ant ? Math.min(ant, score) : score) : Math.max(ant, score), partidas: (p.partidas || 0) + (sumar ? 1 : 0) };
   perfil = { ...perfil, juegos: j };
   const jb = $('#jb'); if (jb) jb.textContent = j[id].mejor;
   try { await db.collection('perfiles').doc(user.uid).set({ juegos: { [id]: j[id] } }, { merge: true }); } catch (e) { toast(errMsg(e)); }
@@ -101,11 +103,9 @@ MODS.push(async a => {
   if (a === 'jrep') { startJuego(); return true; }
   if (a === 'snd') {
     SND = !SND; try { localStorage.setItem('mp_snd', SND ? '1' : '0'); } catch (_) {}
-    $('#sb').textContent = SND ? '🔊' : '🔇';
-    if (J.frame) J.frame.contentWindow.postMessage({ mpSnd: SND }, '*');
+    const sb = $('#sb'); if (sb) sb.textContent = SND ? '🔊' : '🔇';
     return true;
   }
   return false;
 });
 window.addEventListener('hashchange', stopJuego);
-      
