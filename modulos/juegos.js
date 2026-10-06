@@ -10,14 +10,24 @@ function tono(f, d, tipo, v) {
     o.connect(g); g.connect(AC.destination); o.start(); o.stop(t + d);
   } catch (e) {}
 }
+const TAM = { colorrush: 14648, dino: 13121, dodge: 14522, gusanos: 24977, minigolf: 25665, pou: 30374, snake: 18643 };
 function cargaBot(id) {
-  return new Promise((ok, mal) => {
-    if (window.BOT && window.BOT[id]) return ok();
-    const s = document.createElement('script'); s.src = `modulos/juegos/${id}.js?v=15`;
-    s.onload = () => (window.BOT && window.BOT[id]) ? ok() : mal(new Error(`El archivo modulos/juegos/${id}.js cargó pero está vacío o dañado. Vuelve a subirlo.`));
-    s.onerror = () => mal(new Error(`No se encontró modulos/juegos/${id}.js. Súbelo dentro de la carpeta modulos/juegos.`));
+  if (window.BOT && window.BOT[id]) return Promise.resolve();
+  const u = `modulos/juegos/${id}.js?v=16`;
+  const carga = url => new Promise((ok, mal) => {
+    const s = document.createElement('script'); s.src = url;
+    s.onload = () => (window.BOT && window.BOT[id]) ? ok() : mal(new Error('vacio'));
+    s.onerror = () => mal(new Error('404'));
     document.head.appendChild(s);
   });
+  return carga(u)
+    .catch(e => e.message === '404' ? Promise.reject(new Error(`No se encontró modulos/juegos/${id}.js. Súbelo dentro de la carpeta modulos/juegos.`)) : carga(u + '&t=' + Date.now()))
+    .catch(async e => {
+      if (e.message.startsWith('No se encontró')) throw e;
+      let det = '';
+      try { const r = await fetch(u + '&d=' + Date.now(), { cache: 'no-store' }), t = await r.text(); det = ` Recibí ${t.length} caracteres (estado ${r.status}) y deberían ser unos ${TAM[id]}. Empieza con: "${t.slice(0, 40)}".`; } catch (_) {}
+      throw new Error(`El archivo modulos/juegos/${id}.js está incompleto o dañado.${det} Vuelve a subirlo.`);
+    });
 }
 function botGame(id) {
   return a => {
@@ -125,4 +135,3 @@ MODS.push(async a => {
   return false;
 });
 window.addEventListener('hashchange', stopJuego);
-                       
