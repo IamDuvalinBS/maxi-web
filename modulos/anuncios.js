@@ -1,5 +1,5 @@
 // Anuncios solo cuando el usuario los pide (Adsterra). Si pones un Direct Link en "link", se usa ese en lugar de la ventana emergente.
-const ADS = { src: 'https://afders.org/1/b41c3433668ea656bd302ab677eb0a46', link: '', total: 3, espera: 8 };
+const ADS = { src: 'https://afders.org/1/b41c3433668ea656bd302ab677eb0a46', link: 'https://asiafilm.org/4/746c263a78c3d8905dbd8eb2d3143b16', total: 3, espera: 8 };
 let adN = 0, adBusy = false;
 const anunciosView = () => { adBusy = false; return `<section class="card"><div class="ti">📺 Prueba de anuncios</div><p class="mu">Para reclamar recompensas verás ${ADS.total} anuncios. Esta es una prueba de que funcionan.</p><p class="mu">Vistos: <b id="adn">${adN}</b>/${ADS.total}</p><button class="btn" id="adb" data-a="ad">${adN >= ADS.total ? '✅ ¡Listo!' : '▶ Ver anuncio'}</button><div id="adf"></div></section>`; };
 function adReset(msg) {
