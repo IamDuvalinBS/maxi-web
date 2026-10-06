@@ -10,15 +10,29 @@ function tono(f, d, tipo, v) {
     o.connect(g); g.connect(AC.destination); o.start(); o.stop(t + d);
   } catch (e) {}
 }
+function cargaBot(id) {
+  return new Promise((ok, mal) => {
+    if (window.BOT && window.BOT[id]) return ok();
+    const s = document.createElement('script'); s.src = `modulos/juegos/${id}.js?v=15`;
+    s.onload = () => (window.BOT && window.BOT[id]) ? ok() : mal(new Error(`El archivo modulos/juegos/${id}.js cargó pero está vacío o dañado. Vuelve a subirlo.`));
+    s.onerror = () => mal(new Error(`No se encontró modulos/juegos/${id}.js. Súbelo dentro de la carpeta modulos/juegos.`));
+    document.head.appendChild(s);
+  });
+}
 function botGame(id) {
   return a => {
-    const f = document.createElement('iframe');
-    f.className = 'gf'; f.title = JG[id].n; f.setAttribute('sandbox', 'allow-scripts allow-same-origin');
-    f.srcdoc = BOT[id].replace('<head>', `<head><script>window.__BEST=${miJuego(id).mejor || 0};<\/script>`);
-    a.innerHTML = ''; a.appendChild(f); J.frame = f;
-    const on = e => { if (e.source === f.contentWindow && e.data && e.data.mp) guardar(id, +e.data.best || 0, false); };
-    window.addEventListener('message', on);
-    return () => { window.removeEventListener('message', on); f.remove(); J.frame = null; };
+    let vivo = true, f = null, on = null;
+    a.innerHTML = '<p class="msg" style="margin-top:30vh">Cargando juego…</p>';
+    cargaBot(id).then(() => {
+      if (!vivo) return;
+      f = document.createElement('iframe');
+      f.className = 'gf'; f.title = JG[id].n; f.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+      f.srcdoc = window.BOT[id].replace('<head>', `<head><script>window.__BEST=${miJuego(id).mejor || 0};<\/script>`);
+      a.innerHTML = ''; a.appendChild(f); J.frame = f;
+      on = e => { if (e.source === f.contentWindow && e.data && e.data.mp) guardar(id, +e.data.best || 0, false); };
+      window.addEventListener('message', on);
+    }).catch(e => { if (vivo) a.innerHTML = `<div class="card" style="margin:16px"><h2>No se pudo abrir el juego</h2><p class="mu">${esc(e.message)}</p></div>`; });
+    return () => { vivo = false; if (on) window.removeEventListener('message', on); if (f) f.remove(); J.frame = null; };
   };
 }
 function simon(a, fin) {
@@ -83,8 +97,6 @@ function startJuego() {
   const id = location.hash.slice(7), g = JG[id], a = $('#ja'); if (!g || !a) return;
   stopJuego(); J.id = id; window.JUEGO_ACTIVO = location.hash; $('#jo').hidden = true;
   try {
-    if (g.bot && typeof BOT === 'undefined') throw new Error('No cargó modulos/juegos-bot.js. Revisa que esté subido dentro de la carpeta modulos.');
-    if (g.bot && !BOT[id]) throw new Error('Este juego no está en modulos/juegos-bot.js. Sube la versión nueva de ese archivo.');
     J.stop = g.f(a, terminar);
   } catch (e) { a.innerHTML = `<div class="card" style="margin:16px"><h2>No se pudo abrir el juego</h2><p class="mu">${esc(e.message)}</p></div>`; }
 }
@@ -113,4 +125,4 @@ MODS.push(async a => {
   return false;
 });
 window.addEventListener('hashchange', stopJuego);
-                        
+                       
