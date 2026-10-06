@@ -10,13 +10,21 @@ function tono(f, d, tipo, v) {
     o.connect(g); g.connect(AC.destination); o.start(); o.stop(t + d);
   } catch (e) {}
 }
-const TAM = { colorrush: 14648, dino: 13121, dodge: 14522, gusanos: 24977, minigolf: 25665, pou: 30374, snake: 18643 };
+const TAM = {colorrush: 7478, dino: 7088, dodge: 7829, gusanos: 12988, minigolf: 12614, pou: 14798, snake: 9667};
+async function descomprime(b64) {
+  const bin = atob(b64), u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+}
 function cargaBot(id) {
   if (window.BOT && window.BOT[id]) return Promise.resolve();
-  const u = `modulos/juegos/${id}.js?v=16`;
+  const u = `modulos/juegos/${id}.js?v=17`;
   const carga = url => new Promise((ok, mal) => {
     const s = document.createElement('script'); s.src = url;
-    s.onload = () => (window.BOT && window.BOT[id]) ? ok() : mal(new Error('vacio'));
+    s.onload = async () => {
+      try { const z = window.BOTZ && window.BOTZ[id]; if (!z) return mal(new Error('vacio')); (window.BOT = window.BOT || {})[id] = await descomprime(z); ok(); }
+      catch (e) { mal(new Error('vacio')); }
+    };
     s.onerror = () => mal(new Error('404'));
     document.head.appendChild(s);
   });
