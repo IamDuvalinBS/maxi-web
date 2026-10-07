@@ -53,6 +53,21 @@ function botGame(id) {
     return () => { vivo = false; if (on) window.removeEventListener('message', on); if (f) f.remove(); J.frame = null; };
   };
 }
+function embedGame(url, nombre) {
+  return a => {
+    const f = document.createElement('iframe');
+    f.className = 'gf'; f.src = url; f.title = nombre; f.setAttribute('allow', 'autoplay; fullscreen; gamepad; clipboard-write'); f.setAttribute('allowfullscreen', '');
+    a.innerHTML = ''; a.appendChild(f);
+    return () => { f.remove(); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
+  };
+}
+async function horizontal() {
+  const el = $('#ja');
+  try {
+    if (!document.fullscreenElement) { await el.requestFullscreen(); if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); }
+    else { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); await document.exitFullscreen(); }
+  } catch (e) { toast('Tu navegador no permitió girar la pantalla. Activa la rotación del teléfono y gíralo.'); }
+}
 function simon(a, fin) {
   const C = ['#ff3355', '#3388ff', '#28d17c', '#ffd633'], F = [392, 523, 330, 262]; let seq = [], i = 0, ok = false, dead = false; const tms = [];
   a.innerHTML = `<div class="pn" style="--gc:#a66cff"><div class="br">Mambo Bot · Memory Lab</div><div class="tt">🧠 SIMÓN</div><div class="hud"><div>Ronda<b id="s">0</b></div><div>Mejor<b>${miJuego('simon').mejor || 0}</b></div></div><p id="jm" class="msg">Mira la secuencia…</p><div class="gr">${C.map((c, k) => `<button class="cb pd" data-k="${k}" style="--c:${c}" aria-label="Color ${k + 1}"></button>`).join('')}</div></div>`;
@@ -96,19 +111,20 @@ const JG = {
   minigolf: { n: 'Mini Golf', ic: '⛳', d: '18 hoyos: mete la bola con los menos golpes posibles (el récord es el menor).', f: botGame('minigolf'), bot: 1, menor: 1 },
   pou: { n: 'Pou Penales', ic: '⚽', d: 'Patea penales, suma puntos y cuida tus vidas.', f: botGame('pou'), bot: 1 },
   dodge: { n: 'Neon Dodge', ic: '🚀', d: 'Esquiva meteoros de neón y junta orbes.', f: botGame('dodge'), bot: 1 },
+  egg: { n: 'Roba un huevo', ic: '🥚', d: 'Cría animales y roba huevos. Juego de Playgama, mejor en horizontal.', f: embedGame('https://playgama.com/export/game/steal-an-egg-grow-animals?clid=p_9d0b90dd-89dd-479a-9e5f-fe88b6024e4e', 'Roba un huevo'), bot: 1, ext: 1 },
   simon: { n: 'Simón', ic: '🧠', d: 'Memoriza y repite la secuencia de colores.', f: simon },
   tap: { n: 'Tap Veloz', ic: '⚡', d: 'Toca lo más rápido que puedas en 10 segundos.', f: tapVeloz }
 };
 const miJuego = k => ((perfil && perfil.juegos) || {})[k] || {};
 function juegosView() {
   return `<section class="card"><div class="ti">🎮 Juegos</div><p class="mu">Tu mejor puntaje se guarda en tu cuenta.</p></section>` +
-    Object.keys(JG).map(k => { const g = JG[k], s = miJuego(k); return `<a class="card chr" href="#juego/${k}"><span style="font-size:2rem">${g.ic}</span><div><b>${g.n}</b><small class="mu">${g.d}</small><small>Mejor: <b>${s.mejor || 0}</b>${s.partidas ? ' · Partidas: ' + s.partidas : ''}</small></div></a>`; }).join('');
+    Object.keys(JG).map(k => { const g = JG[k], s = miJuego(k); return `<a class="card chr" href="#juego/${k}"><span style="font-size:2rem">${g.ic}</span><div><b>${g.n}</b><small class="mu">${g.d}</small>${g.ext ? '<small>Juego de Playgama</small>' : `<small>Mejor: <b>${s.mejor || 0}</b>${s.partidas ? ' · Partidas: ' + s.partidas : ''}</small>`}</div></a>`; }).join('');
 }
 function juegoView() {
   const k = location.hash.slice(7), g = JG[k];
   if (!g) return `<section class="card">${empty('🎮', 'Ese juego no existe.')}</section>`;
   setTimeout(startJuego, 0);
-  return `<section class="card gamefull" id="jg"><div class="chh"><a href="#juegos" class="ib" aria-label="Volver">←</a><b>${g.ic} ${g.n}</b><span class="mu" style="margin-left:auto">Mejor: <b id="jb">${miJuego(k).mejor || 0}</b></span>${g.bot ? '' : `<button class="ib" data-a="snd" id="sb" aria-label="Sonido">${SND ? '🔊' : '🔇'}</button>`}</div><div id="ja" class="ja${g.bot ? ' gfw' : ''}"></div><div id="jo" class="jo" hidden><div class="card"><h2 id="jt"></h2><p id="jx"></p><button class="btn" data-a="jrep">▶ Jugar de nuevo</button> <a class="btn sec" href="#juegos">Salir</a></div></div></section>`;
+  return `<section class="card gamefull" id="jg"><div class="chh"><a href="#juegos" class="ib" aria-label="Volver">←</a><b>${g.ic} ${g.n}</b>${g.ext ? '<button class="ib" style="margin-left:auto;font-size:1rem" data-a="horiz" aria-label="Pantalla horizontal">↻ Horizontal</button>' : `<span class="mu" style="margin-left:auto">Mejor: <b id="jb">${miJuego(k).mejor || 0}</b></span>`}${g.bot ? '' : `<button class="ib" data-a="snd" id="sb" aria-label="Sonido">${SND ? '🔊' : '🔇'}</button>`}</div><div id="ja" class="ja${g.bot ? ' gfw' : ''}"></div><div id="jo" class="jo" hidden><div class="card"><h2 id="jt"></h2><p id="jx"></p><button class="btn" data-a="jrep">▶ Jugar de nuevo</button> <a class="btn sec" href="#juegos">Salir</a></div></div></section>`;
 }
 function stopJuego() { if (J.stop) J.stop(); J.stop = null; window.JUEGO_ACTIVO = null; }
 function startJuego() {
@@ -135,6 +151,7 @@ function terminar(score, extra) {
 }
 MODS.push(async a => {
   if (a === 'jrep') { startJuego(); return true; }
+  if (a === 'horiz') { await horizontal(); return true; }
   if (a === 'snd') {
     SND = !SND; try { localStorage.setItem('mp_snd', SND ? '1' : '0'); } catch (_) {}
     const sb = $('#sb'); if (sb) sb.textContent = SND ? '🔊' : '🔇';
@@ -143,3 +160,4 @@ MODS.push(async a => {
   return false;
 });
 window.addEventListener('hashchange', stopJuego);
+      
