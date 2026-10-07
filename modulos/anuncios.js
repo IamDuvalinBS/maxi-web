@@ -19,6 +19,7 @@ function adEspera() {
 MODS.push(async a => {
   if (a !== 'ad') return false;
   if (adBusy) return true;
+  if (typeof owner !== 'undefined' && owner) { adN = ADS.total; const n = $('#adn'); if (n) n.textContent = adN; adReset('Eres owner: no necesitas ver anuncios.'); return true; }
   if (adN >= ADS.total) { toast('¡Listo! Ya viste los ' + ADS.total + ' anuncios.'); return true; }
   adBusy = true; const btn = $('#adb'); btn.disabled = true;
   if (ADS.link) { window.open(ADS.link, '_blank', 'noopener'); adEspera(); return true; }
