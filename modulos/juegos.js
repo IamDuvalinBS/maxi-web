@@ -53,12 +53,26 @@ function botGame(id) {
     return () => { vivo = false; if (on) window.removeEventListener('message', on); if (f) f.remove(); J.frame = null; };
   };
 }
-function embedGame(url, nombre) {
+async function guardarExt(id, min) {
+  if (min < 0.1 || !db || !user) return;
+  const j = { ...(perfil && perfil.juegos) }, p = j[id] || {};
+  j[id] = { ...p, partidas: (p.partidas || 0) + 1, minutos: Math.round(((p.minutos || 0) + min) * 10) / 10, ultima: Date.now() };
+  perfil = { ...perfil, juegos: j };
+  try { await db.collection('perfiles').doc(user.uid).set({ juegos: { [id]: j[id] } }, { merge: true }); } catch (e) {}
+}
+function embedGame(id, url, nombre) {
   return a => {
     const f = document.createElement('iframe');
     f.className = 'gf'; f.src = url; f.title = nombre; f.setAttribute('allow', 'autoplay; fullscreen; gamepad; clipboard-write'); f.setAttribute('allowfullscreen', '');
     a.innerHTML = ''; a.appendChild(f);
-    return () => { f.remove(); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
+    let t0 = Date.now(), ms = 0, vis = !document.hidden;
+    const onv = () => { const n = Date.now(); if (vis) ms += n - t0; t0 = n; vis = !document.hidden; };
+    document.addEventListener('visibilitychange', onv);
+    return () => {
+      document.removeEventListener('visibilitychange', onv); onv(); f.remove();
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      guardarExt(id, ms / 60000);
+    };
   };
 }
 async function horizontal() {
@@ -103,6 +117,7 @@ function tapVeloz(a, fin) {
   });
   return () => { clearTimeout(tm); cancelAnimationFrame(raf); };
 }
+const PG = 'https://playgama.com/export/', CLID = 'p_9d0b90dd-89dd-479a-9e5f-fe88b6024e4e';
 const JG = {
   colorrush: { n: 'Color Rush', ic: '🎨', d: 'Toca el color correcto antes de que se acabe el tiempo.', f: botGame('colorrush'), bot: 1 },
   dino: { n: 'Dino', ic: '🦖', d: 'Salta los cactus y esquiva los pájaros.', f: botGame('dino'), bot: 1 },
@@ -111,14 +126,25 @@ const JG = {
   minigolf: { n: 'Mini Golf', ic: '⛳', d: '18 hoyos: mete la bola con los menos golpes posibles (el récord es el menor).', f: botGame('minigolf'), bot: 1, menor: 1 },
   pou: { n: 'Pou Penales', ic: '⚽', d: 'Patea penales, suma puntos y cuida tus vidas.', f: botGame('pou'), bot: 1 },
   dodge: { n: 'Neon Dodge', ic: '🚀', d: 'Esquiva meteoros de neón y junta orbes.', f: botGame('dodge'), bot: 1 },
-  egg: { n: 'Roba un huevo', ic: '🥚', d: 'Cría animales y roba huevos. Juego de Playgama, mejor en horizontal.', f: embedGame('https://playgama.com/export/game/steal-an-egg-grow-animals?clid=p_9d0b90dd-89dd-479a-9e5f-fe88b6024e4e', 'Roba un huevo'), bot: 1, ext: 1 },
+  egg: { n: 'Roba un huevo', ic: '🥚', d: 'Cría animales y roba huevos.', f: embedGame('egg', PG + 'game/steal-an-egg-grow-animals?clid=' + CLID, 'Roba un huevo'), bot: 1, ext: 1 },
+  tbworld: { n: 'TB World', ic: '🌐', d: 'Juego patrocinado de Playgama.', f: embedGame('tbworld', PG + 'game/tb-world?clid=' + CLID, 'TB World'), bot: 1, ext: 1 },
+  pvz: { n: 'Plants vs Zombies Hybrids', ic: '🌻', d: 'Juego patrocinado de Playgama.', f: embedGame('pvz', PG + 'game/plants-vs-zombies-hybrids?clid=' + CLID, 'Plants vs Zombies Hybrids'), bot: 1, ext: 1 },
+  deadly: { n: 'Deadly Descent', ic: '💀', d: 'Juego patrocinado de Playgama.', f: embedGame('deadly', 'https://deadlydescent.net/export?clid=' + CLID, 'Deadly Descent'), bot: 1, ext: 1 },
+  geometry: { n: 'Geometry Vibes 3D', ic: '🔷', d: 'Juego patrocinado de Playgama.', f: embedGame('geometry', PG + 'game/geometry-vibes-3d?clid=' + CLID, 'Geometry Vibes 3D'), bot: 1, ext: 1 },
   simon: { n: 'Simón', ic: '🧠', d: 'Memoriza y repite la secuencia de colores.', f: simon },
   tap: { n: 'Tap Veloz', ic: '⚡', d: 'Toca lo más rápido que puedas en 10 segundos.', f: tapVeloz }
 };
 const miJuego = k => ((perfil && perfil.juegos) || {})[k] || {};
 function juegosView() {
-  return `<section class="card"><div class="ti">🎮 Juegos</div><p class="mu">Tu mejor puntaje se guarda en tu cuenta.</p></section>` +
-    Object.keys(JG).map(k => { const g = JG[k], s = miJuego(k); return `<a class="card chr" href="#juego/${k}"><span style="font-size:2rem">${g.ic}</span><div><b>${g.n}</b><small class="mu">${g.d}</small>${g.ext ? '<small>Juego de Playgama</small>' : `<small>Mejor: <b>${s.mejor || 0}</b>${s.partidas ? ' · Partidas: ' + s.partidas : ''}</small>`}</div></a>`; }).join('');
+  const tarjeta = k => {
+    const g = JG[k], s = miJuego(k);
+    const info = g.ext ? (s.partidas ? `Jugado ${s.partidas} ${s.partidas === 1 ? 'vez' : 'veces'} · ${s.minutos} min` : 'Juego patrocinado') : `Mejor: <b>${s.mejor || 0}</b>${s.partidas ? ' · Partidas: ' + s.partidas : ''}`;
+    return `<a class="card chr" href="#juego/${k}"><span style="font-size:2rem">${g.ic}</span><div><b>${g.n}</b><small class="mu">${g.d}</small><small>${info}</small></div></a>`;
+  };
+  const ks = Object.keys(JG);
+  return `<section class="card"><div class="ti">🎮 Juegos</div><p class="mu">Tus récords y tu tiempo jugado se guardan en tu cuenta.</p></section>` +
+    `<div class="gl2">PATROCINADORES</div>` + ks.filter(k => JG[k].ext).map(tarjeta).join('') +
+    `<div class="gl2">JUEGOS OFICIALES</div>` + ks.filter(k => !JG[k].ext).map(tarjeta).join('');
 }
 function juegoView() {
   const k = location.hash.slice(7), g = JG[k];
@@ -160,4 +186,4 @@ MODS.push(async a => {
   return false;
 });
 window.addEventListener('hashchange', stopJuego);
-      
+    
