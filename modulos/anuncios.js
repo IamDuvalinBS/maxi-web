@@ -1,11 +1,11 @@
 // Anuncios solo cuando el usuario los pide (Adsterra). Cada anuncio completo suma 1 en la cuenta.
 const ADS = { src: 'https://afders.org/1/b41c3433668ea656bd302ab677eb0a46', link: 'https://asiafilm.org/4/746c263a78c3d8905dbd8eb2d3143b16', espera: 8 };
 let adBusy = false;
-const anunciosView = () => { adBusy = false; return `<section class="card"><div class="ti">📺 Ver anuncios</div><p class="mu">Cada anuncio completo suma 1 y desbloquea banners. Llevas <b id="adn">${stats().ads}</b>.</p><button class="btn" id="adb" data-a="ad">▶ Ver anuncio</button><div id="adf"></div></section>`; };
+const anunciosView = () => { adBusy = false; return `<section class="card"><div class="ti">${ic('tv', 22)}<span>Ver anuncios</span></div><p class="mu">Cada anuncio completo suma 1 y desbloquea banners. Llevas <b id="adn">${stats().ads}</b>.</p><button class="btn" id="adb" data-a="ad">${ic('play', 16)}Ver anuncio</button><div id="adf"></div></section>`; };
 function adReset(msg) {
   adBusy = false; const b = $('#adb'), f = $('#adf');
   if (f) f.innerHTML = '';
-  if (b) { b.disabled = false; b.textContent = '▶ Ver anuncio'; }
+  if (b) { b.disabled = false; b.innerHTML = ic('play', 16) + 'Ver anuncio'; }
   if (msg) toast(msg);
 }
 function adEspera() {
@@ -16,7 +16,7 @@ function adEspera() {
     if (s <= 0) {
       clearInterval(t); const st = stats(); st.ads++; gStats();
       const n = $('#adn'); if (n) n.textContent = st.ads;
-      adReset(); if ([10, 20].includes(st.ads)) { toast('🎁 ¡Misión completada! Reclama tu banner en esta pantalla.'); render(); }
+      adReset(); if ([10, 20].includes(st.ads)) { toast('¡Misión completada! Reclama tu banner en esta pantalla.'); render(); }
     }
   }, 1000);
 }

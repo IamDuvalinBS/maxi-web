@@ -84,7 +84,7 @@ async function horizontal() {
 }
 function simon(a, fin) {
   const C = ['#ff3355', '#3388ff', '#28d17c', '#ffd633'], F = [392, 523, 330, 262]; let seq = [], i = 0, ok = false, dead = false; const tms = [];
-  a.innerHTML = `<div class="pn" style="--gc:#a66cff"><div class="br">Mambo Bot · Memory Lab</div><div class="tt">🧠 SIMÓN</div><div class="hud"><div>Ronda<b id="s">0</b></div><div>Mejor<b>${miJuego('simon').mejor || 0}</b></div></div><p id="jm" class="msg">Mira la secuencia…</p><div class="gr">${C.map((c, k) => `<button class="cb pd" data-k="${k}" style="--c:${c}" aria-label="Color ${k + 1}"></button>`).join('')}</div></div>`;
+  a.innerHTML = `<div class="pn" style="--gc:#a66cff"><div class="br">Mambo Bot · Memory Lab</div><div class="tt">SIMÓN</div><div class="hud"><div>Ronda<b id="s">0</b></div><div>Mejor<b>${miJuego('simon').mejor || 0}</b></div></div><p id="jm" class="msg">Mira la secuencia…</p><div class="gr">${C.map((c, k) => `<button class="cb pd" data-k="${k}" style="--c:${c}" aria-label="Color ${k + 1}"></button>`).join('')}</div></div>`;
   const pads = a.querySelectorAll('.pd'), W = (f, ms) => tms.push(setTimeout(f, ms));
   const lit = k => { pads[k].classList.add('on'); tono(F[k], .28, 'triangle'); W(() => pads[k].classList.remove('on'), 300); };
   const play = () => {
@@ -103,7 +103,7 @@ function simon(a, fin) {
 }
 function tapVeloz(a, fin) {
   let n = 0, started = false, end0 = 0, tm = null, raf = 0;
-  a.innerHTML = `<div class="pn" style="--gc:#ff9f43"><div class="br">Mambo Bot · Speed Lab</div><div class="tt">⚡ TAP VELOZ</div><div class="hud"><div>Toques<b id="s">0</b></div><div>Tiempo<b id="t">10.0</b></div><div>Mejor<b>${miJuego('tap').mejor || 0}</b></div></div><div class="jbar"><div id="bar"></div></div><div id="tb" class="tbc"><span>TOCA</span></div><p class="msg">El tiempo empieza con tu primer toque.</p></div>`;
+  a.innerHTML = `<div class="pn" style="--gc:#ff9f43"><div class="br">Mambo Bot · Speed Lab</div><div class="tt">TAP VELOZ</div><div class="hud"><div>Toques<b id="s">0</b></div><div>Tiempo<b id="t">10.0</b></div><div>Mejor<b>${miJuego('tap').mejor || 0}</b></div></div><div class="jbar"><div id="bar"></div></div><div id="tb" class="tbc"><span>TOCA</span></div><p class="msg">El tiempo empieza con tu primer toque.</p></div>`;
   const paint = () => { raf = 0; $('#s').textContent = n; };
   const tick = () => {
     const t = Math.max(0, (end0 - Date.now()) / 1000); $('#t').textContent = t.toFixed(1); $('#bar').style.transform = `scaleX(${t / 10})`;
@@ -119,40 +119,40 @@ function tapVeloz(a, fin) {
 }
 const PG = 'https://playgama.com/export/', CLID = 'p_9d0b90dd-89dd-479a-9e5f-fe88b6024e4e';
 const JG = {
-  colorrush: { n: 'Color Rush', ic: '🎨', d: 'Toca el color correcto antes de que se acabe el tiempo.', f: botGame('colorrush'), bot: 1 },
-  dino: { n: 'Dino', ic: '🦖', d: 'Salta los cactus y esquiva los pájaros.', f: botGame('dino'), bot: 1 },
-  snake: { n: 'Snake Fruits', ic: '🐍', d: 'Come frutas y crece sin chocar. Varios modos.', f: botGame('snake'), bot: 1 },
-  gusanos: { n: 'Gusanos Neón', ic: '🐛', d: 'Come puntos, crece y haz que los demás choquen contigo.', f: botGame('gusanos'), bot: 1 },
-  minigolf: { n: 'Mini Golf', ic: '⛳', d: '18 hoyos: mete la bola con los menos golpes posibles (el récord es el menor).', f: botGame('minigolf'), bot: 1, menor: 1 },
-  pou: { n: 'Pou Penales', ic: '⚽', d: 'Patea penales, suma puntos y cuida tus vidas.', f: botGame('pou'), bot: 1 },
-  dodge: { n: 'Neon Dodge', ic: '🚀', d: 'Esquiva meteoros de neón y junta orbes.', f: botGame('dodge'), bot: 1 },
-  egg: { n: 'Roba un huevo', ic: '🥚', d: 'Cría animales y roba huevos.', f: embedGame('egg', PG + 'game/steal-an-egg-grow-animals?clid=' + CLID, 'Roba un huevo'), bot: 1, ext: 1 },
-  gym: { n: 'Gym Simulator: Escape', ic: '🏋️', d: 'Juego patrocinado de Playgama.', f: embedGame('gym', PG + 'game/gym-simulator-online-escape?clid=' + CLID, 'Gym Simulator'), bot: 1, ext: 1 },
-  obby: { n: 'Obby: Digging Power', ic: '⛏️', d: 'Juego patrocinado de Playgama.', f: embedGame('obby', PG + 'game/obby-1-digging-power-per-click?clid=' + CLID, 'Obby Digging Power'), bot: 1, ext: 1 },
-  tbworld: { n: 'TB World', ic: '🌐', d: 'Juego patrocinado de Playgama.', f: embedGame('tbworld', PG + 'game/tb-world?clid=' + CLID, 'TB World'), bot: 1, ext: 1 },
-  pvz: { n: 'Plants vs Zombies Hybrids', ic: '🌻', d: 'Juego patrocinado de Playgama.', f: embedGame('pvz', PG + 'game/plants-vs-zombies-hybrids?clid=' + CLID, 'Plants vs Zombies Hybrids'), bot: 1, ext: 1 },
-  deadly: { n: 'Deadly Descent', ic: '💀', d: 'Juego patrocinado de Playgama.', f: embedGame('deadly', 'https://deadlydescent.net/export?clid=' + CLID, 'Deadly Descent'), bot: 1, ext: 1 },
-  geometry: { n: 'Geometry Vibes 3D', ic: '🔷', d: 'Juego patrocinado de Playgama.', f: embedGame('geometry', PG + 'game/geometry-vibes-3d?clid=' + CLID, 'Geometry Vibes 3D'), bot: 1, ext: 1 },
-  simon: { n: 'Simón', ic: '🧠', d: 'Memoriza y repite la secuencia de colores.', f: simon },
-  tap: { n: 'Tap Veloz', ic: '⚡', d: 'Toca lo más rápido que puedas en 10 segundos.', f: tapVeloz }
+  colorrush: { n: 'Color Rush', ic: 'palette', d: 'Toca el color correcto antes de que se acabe el tiempo.', f: botGame('colorrush'), bot: 1 },
+  dino: { n: 'Dino', ic: 'paw', d: 'Salta los cactus y esquiva los pájaros.', f: botGame('dino'), bot: 1 },
+  snake: { n: 'Snake Fruits', ic: 'snake', d: 'Come frutas y crece sin chocar. Varios modos.', f: botGame('snake'), bot: 1 },
+  gusanos: { n: 'Gusanos Neón', ic: 'worm', d: 'Come puntos, crece y haz que los demás choquen contigo.', f: botGame('gusanos'), bot: 1 },
+  minigolf: { n: 'Mini Golf', ic: 'flag', d: '18 hoyos: mete la bola con los menos golpes posibles (el récord es el menor).', f: botGame('minigolf'), bot: 1, menor: 1 },
+  pou: { n: 'Pou Penales', ic: 'ball', d: 'Patea penales, suma puntos y cuida tus vidas.', f: botGame('pou'), bot: 1 },
+  dodge: { n: 'Neon Dodge', ic: 'rocket', d: 'Esquiva meteoros de neón y junta orbes.', f: botGame('dodge'), bot: 1 },
+  egg: { n: 'Roba un huevo', ic: 'egg', d: 'Cría animales y roba huevos.', f: embedGame('egg', PG + 'game/steal-an-egg-grow-animals?clid=' + CLID, 'Roba un huevo'), bot: 1, ext: 1 },
+  gym: { n: 'Gym Simulator: Escape', ic: 'dumbbell', d: 'Juego patrocinado de Playgama.', f: embedGame('gym', PG + 'game/gym-simulator-online-escape?clid=' + CLID, 'Gym Simulator'), bot: 1, ext: 1 },
+  obby: { n: 'Obby: Digging Power', ic: 'pick', d: 'Juego patrocinado de Playgama.', f: embedGame('obby', PG + 'game/obby-1-digging-power-per-click?clid=' + CLID, 'Obby Digging Power'), bot: 1, ext: 1 },
+  tbworld: { n: 'TB World', ic: 'globe', d: 'Juego patrocinado de Playgama.', f: embedGame('tbworld', PG + 'game/tb-world?clid=' + CLID, 'TB World'), bot: 1, ext: 1 },
+  pvz: { n: 'Plants vs Zombies Hybrids', ic: 'flower', d: 'Juego patrocinado de Playgama.', f: embedGame('pvz', PG + 'game/plants-vs-zombies-hybrids?clid=' + CLID, 'Plants vs Zombies Hybrids'), bot: 1, ext: 1 },
+  deadly: { n: 'Deadly Descent', ic: 'skull', d: 'Juego patrocinado de Playgama.', f: embedGame('deadly', 'https://deadlydescent.net/export?clid=' + CLID, 'Deadly Descent'), bot: 1, ext: 1 },
+  geometry: { n: 'Geometry Vibes 3D', ic: 'diamond', d: 'Juego patrocinado de Playgama.', f: embedGame('geometry', PG + 'game/geometry-vibes-3d?clid=' + CLID, 'Geometry Vibes 3D'), bot: 1, ext: 1 },
+  simon: { n: 'Simón', ic: 'grid', d: 'Memoriza y repite la secuencia de colores.', f: simon },
+  tap: { n: 'Tap Veloz', ic: 'bolt', d: 'Toca lo más rápido que puedas en 10 segundos.', f: tapVeloz }
 };
 const miJuego = k => ((perfil && perfil.juegos) || {})[k] || {};
 function juegosView() {
   const tarjeta = k => {
     const g = JG[k], s = miJuego(k);
     const info = g.ext ? (s.partidas ? `Jugado ${s.partidas} ${s.partidas === 1 ? 'vez' : 'veces'} · ${s.minutos} min` : 'Juego patrocinado') : `Mejor: <b>${s.mejor || 0}</b>${s.partidas ? ' · Partidas: ' + s.partidas : ''}`;
-    return `<a class="card chr" href="#juego/${k}"><span style="font-size:2rem">${g.ic}</span><div><b>${g.n}</b><small class="mu">${g.d}</small><small>${info}</small></div></a>`;
+    return `<a class="card chr" href="#juego/${k}"><span class="gic">${ic(g.ic, 30)}</span><div><b>${g.n}</b><small class="mu">${g.d}</small><small>${info}</small></div></a>`;
   };
   const ks = Object.keys(JG);
-  return `<section class="card"><div class="ti">🎮 Juegos</div><p class="mu">Tus récords y tu tiempo jugado se guardan en tu cuenta.</p></section>` +
+  return `<section class="card"><div class="ti">${ic('game', 24)}<span>Juegos</span></div><p class="mu">Tus récords y tu tiempo jugado se guardan en tu cuenta.</p></section>` +
     `<div class="gl2">PATROCINADORES</div>` + ks.filter(k => JG[k].ext).map(tarjeta).join('') +
     `<div class="gl2">JUEGOS OFICIALES</div>` + ks.filter(k => !JG[k].ext).map(tarjeta).join('');
 }
 function juegoView() {
   const k = location.hash.slice(7), g = JG[k];
-  if (!g) return `<section class="card">${empty('🎮', 'Ese juego no existe.')}</section>`;
+  if (!g) return `<section class="card">${empty('game', 'Ese juego no existe.')}</section>`;
   setTimeout(startJuego, 0);
-  return `<section class="card gamefull" id="jg"><div class="chh"><a href="#juegos" class="ib" aria-label="Volver">←</a><b>${g.ic} ${g.n}</b>${g.ext ? '<button class="ib" style="margin-left:auto;font-size:1rem" data-a="horiz" aria-label="Pantalla horizontal">↻ Horizontal</button>' : `<span class="mu" style="margin-left:auto">Mejor: <b id="jb">${miJuego(k).mejor || 0}</b></span>`}${g.bot ? '' : `<button class="ib" data-a="snd" id="sb" aria-label="Sonido">${SND ? '🔊' : '🔇'}</button>`}</div><div id="ja" class="ja${g.bot ? ' gfw' : ''}"></div><div id="jo" class="jo" hidden><div class="card"><h2 id="jt"></h2><p id="jx"></p><button class="btn" data-a="jrep">▶ Jugar de nuevo</button> <a class="btn sec" href="#juegos">Salir</a></div></div></section>`;
+  return `<section class="card gamefull" id="jg"><div class="chh"><a href="#juegos" class="ib" aria-label="Volver">${ic('back', 24)}</a><b class="gt"><span class="gic">${ic(g.ic, 22)}</span>${g.n}</b>${g.ext ? `<button class="ib hz" style="margin-left:auto" data-a="horiz" aria-label="Pantalla horizontal">${ic('rotate', 18)} Horizontal</button>` : `<span class="mu" style="margin-left:auto">Mejor: <b id="jb">${miJuego(k).mejor || 0}</b></span>`}${g.bot ? '' : `<button class="ib" data-a="snd" id="sb" aria-label="Sonido">${ic(SND ? 'volume' : 'mute', 22)}</button>`}</div><div id="ja" class="ja${g.bot ? ' gfw' : ''}"></div><div id="jo" class="jo" hidden><div class="card"><h2 id="jt"></h2><p id="jx"></p><button class="btn" data-a="jrep">${ic('play', 16)}Jugar de nuevo</button> <a class="btn sec" href="#juegos">Salir</a></div></div></section>`;
 }
 function stopJuego() { if (J.stop) J.stop(); J.stop = null; window.JUEGO_ACTIVO = null; if (typeof jugadaFin === 'function') jugadaFin(); }
 function startJuego() {
@@ -173,7 +173,7 @@ async function guardar(id, score, sumar) {
 }
 function terminar(score, extra) {
   const prev = miJuego(J.id).mejor || 0;
-  $('#jt').textContent = score > prev ? '🏆 ¡Nuevo récord!' : '🏁 Fin';
+  $('#jt').innerHTML = score > prev ? ic('trophy', 26) + ' ¡Nuevo récord!' : ic('flag', 26) + ' Fin';
   $('#jx').innerHTML = `Puntos: <b>${score}</b><br>${extra}<br>Mejor: <b>${Math.max(prev, score)}</b>`;
   $('#jo').hidden = false; guardar(J.id, score, true);
 }
@@ -182,7 +182,7 @@ MODS.push(async a => {
   if (a === 'horiz') { await horizontal(); return true; }
   if (a === 'snd') {
     SND = !SND; try { localStorage.setItem('mp_snd', SND ? '1' : '0'); } catch (_) {}
-    const sb = $('#sb'); if (sb) sb.textContent = SND ? '🔊' : '🔇';
+    const sb = $('#sb'); if (sb) sb.innerHTML = ic(SND ? 'volume' : 'mute', 22);
     return true;
   }
   return false;

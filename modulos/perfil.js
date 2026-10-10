@@ -37,11 +37,11 @@ function acumula() {
 }
 function hud() {
   if (!TJ) return; const s = stats(), pr = x => Math.floor(x.f(s));
-  MIS.forEach(x => { if (pr(x) >= x.meta && !TJ.hechas.has(x.id)) { TJ.hechas.add(x.id); toast('🎯 ¡Misión completada: ' + x.t + '! Reclama tu premio en Misiones.'); } });
+  MIS.forEach(x => { if (pr(x) >= x.meta && !TJ.hechas.has(x.id)) { TJ.hechas.add(x.id); toast('¡Misión completada: ' + x.t + '! Reclama tu premio en Misiones.'); } });
   const m = MIS.find(x => x.u !== 'anuncios' && pr(x) < x.meta); let h = $('#mhud');
   if (!m) { if (h) h.remove(); return; }
   if (!h) { h = document.createElement('div'); h.id = 'mhud'; document.body.appendChild(h); }
-  h.textContent = '🎯 ' + pr(m) + '/' + m.meta + ' ' + m.u;
+  h.innerHTML = ic('target', 14) + ' ' + pr(m) + '/' + m.meta + ' ' + esc(m.u);
 }
 function tickJ() { acumula(); if (Date.now() - TJ.ult > 60000) { TJ.ult = Date.now(); gStats(); } hud(); }
 function jugadaIniciar(id) {
@@ -60,9 +60,9 @@ window.addEventListener('pagehide', () => { if (TJ) { acumula(); gStats(); } });
 // ---- Pantallas ----
 function misionesView() {
   const s = stats(), rc = perfil.rec || {};
-  return `<section class="card"><div class="ti">🎯 Misiones</div><p class="mu">Juega y gana cosméticos para tu perfil. Se guardan para siempre en tu cuenta.</p></section>` + MIS.map(m => {
+  return `<section class="card"><div class="ti">${ic('target', 24)}<span>Misiones</span></div><p class="mu">Juega y gana cosméticos para tu perfil. Se guardan para siempre en tu cuenta.</p></section>` + MIS.map(m => {
     const p = owner ? m.meta : Math.floor(m.f(s)), ok = p >= m.meta;
-    return `<section class="card ms"><div class="mt"><b>${m.t}</b><span class="mu">${Math.min(p, m.meta)}/${m.meta} ${m.u}</span></div><p class="mu">${m.d}</p><div class="jbar"><div style="transform:scaleX(${Math.min(1, p / m.meta)})"></div></div><div class="mr">🎁 ${cosPrev(m.rec)}<span>${esc(COS[m.rec].n)}</span>${owner ? '<span class="ok">👑 Desbloqueada (owner)</span>' : rc[m.id] ? '<span class="ok">✔ Reclamada</span>' : ok ? `<button class="btn" data-a="reclamar" data-id="${m.id}">Reclamar</button>` : ''}</div></section>`;
+    return `<section class="card ms"><div class="mt"><b>${m.t}</b><span class="mu">${Math.min(p, m.meta)}/${m.meta} ${m.u}</span></div><p class="mu">${m.d}</p><div class="jbar"><div style="transform:scaleX(${Math.min(1, p / m.meta)})"></div></div><div class="mr"><span class="gi">${ic('gift', 18)}</span>${cosPrev(m.rec)}<span>${esc(COS[m.rec].n)}</span>${owner ? `<span class="ok">${ic('crown', 14)} Desbloqueada (owner)</span>` : rc[m.id] ? `<span class="ok">${ic('check', 14)} Reclamada</span>` : ok ? `<button class="btn" data-a="reclamar" data-id="${m.id}">Reclamar</button>` : ''}</div></section>`;
   }).join('') + (typeof anunciosView === 'function' ? anunciosView() : '');
 }
 function perfilView() {
@@ -70,17 +70,17 @@ function perfilView() {
   const dias = p.creado && p.creado.seconds ? Math.max(1, Math.floor((Date.now() / 1000 - p.creado.seconds) / 86400)) : 1;
   const portada = eq.portada && COS[eq.portada] ? COS[eq.portada].c : 'linear-gradient(135deg,#0e7490,#6d28d9)';
   const jug = Object.keys(JG).filter(k => s.pp[k]);
-  return `<section class="card pr"><div class="pb" style="background:${portada}"></div><div class="pa">${avatar(96)}<label class="pen" for="fi" aria-label="Cambiar foto"><svg viewBox="0 0 24 24" width="16" height="16" fill="#04262b" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></label><input id="fi" type="file" accept="image/*" hidden></div><div class="in"><div class="pn2"><b>${esc(nombre())}</b> ${owner ? vf() : ''}</div><div class="mu" style="text-align:center;margin-bottom:8px">ID: <b>${esc(p.idn || '…')}</b></div>
+  return `<section class="card pr"><div class="pb" style="background:${portada}"></div><div class="pa">${avatar(96)}<label class="pen" for="fi" aria-label="Cambiar foto"><svg viewBox="0 0 24 24" width="16" height="16" fill="#fff" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></label><input id="fi" type="file" accept="image/*" hidden></div><div class="in"><div class="pn2"><b>${esc(nombre())}</b> ${owner ? vf() : ''}</div><div class="mu" style="text-align:center;margin-bottom:8px">ID: <b>${esc(p.idn || '…')}</b></div>
     <input id="bio" maxlength="80" value="${esc(p.bio || '')}" placeholder="Escribe algo aquí…" aria-label="Biografía"><button class="btn sec" data-a="bio" style="margin-top:8px">Guardar frase</button>
     <div class="sr"><div>NIVEL<b>${1 + Math.floor(s.min / 5)}</b></div><div>DÍAS AQUÍ<b>${dias}</b></div><div>MINUTOS<b>${Math.floor(s.min)}</b></div></div></div></section>
-  <section class="card"><div class="ti">🎁 Colección <span class="mu" style="font-size:.9rem">(${tengo}/${ks.length})</span></div><div class="cg">${ks.map(k => { const c = COS[k], t = cos[k]; return `<div class="ct${t ? '' : ' lock'}">${cosPrev(k)}${esc(c.n)}${t ? `<button class="btn sec" style="margin:6px 0 0;padding:6px 8px;font-size:.75rem" data-a="equipar" data-id="${k}">${eq[c.t] === k ? 'Quitar' : 'Usar'}</button>` : '<div class="mu">🔒 Bloqueado</div>'}</div>`; }).join('')}</div></section>
-  <section class="card"><div class="ti">📊 Mis estadísticas</div>${jug.length ? jug.map(k => { const g = JG[k], m = s.pj[k] || 0; return `<div class="er"><span style="font-size:1.6rem">${g.ic}</span><div style="flex:1;min-width:0"><b>${g.n}</b> <span class="mu">Nivel ${1 + Math.floor(m / 5)}</span><div class="jbar"><div style="transform:scaleX(${(m % 5) / 5})"></div></div><small class="mu">Partidas: ${s.pp[k]} · ${Math.floor(m)} min</small></div></div>`; }).join('') : empty('🎮', 'Aún no has jugado. Tus estadísticas aparecerán aquí.')}</section>`;
+  <section class="card"><div class="ti">${ic('gift', 22)}<span>Colección</span> <span class="mu" style="font-size:.9rem">(${tengo}/${ks.length})</span></div><div class="cg">${ks.map(k => { const c = COS[k], t = cos[k]; return `<div class="ct${t ? '' : ' lock'}">${cosPrev(k)}${esc(c.n)}${t ? `<button class="btn sec" style="margin:6px 0 0;padding:6px 8px;font-size:.75rem" data-a="equipar" data-id="${k}">${eq[c.t] === k ? 'Quitar' : 'Usar'}</button>` : `<div class="mu lk">${ic('lock', 14)} Bloqueado</div>`}</div>`; }).join('')}</div></section>
+  <section class="card"><div class="ti">${ic('chart', 22)}<span>Mis estadísticas</span></div>${jug.length ? jug.map(k => { const g = JG[k], m = s.pj[k] || 0; return `<div class="er"><span class="gic">${ic(g.ic, 26)}</span><div style="flex:1;min-width:0"><b>${g.n}</b> <span class="mu">Nivel ${1 + Math.floor(m / 5)}</span><div class="jbar"><div style="transform:scaleX(${(m % 5) / 5})"></div></div><small class="mu">Partidas: ${s.pp[k]} · ${Math.floor(m)} min</small></div></div>`; }).join('') : empty('game', 'Aún no has jugado. Tus estadísticas aparecerán aquí.')}</section>`;
 }
 MODS.push(async (a, t) => {
   if (a === 'reclamar') {
     const m = MIS.find(x => x.id === t.dataset.id); if (!m || Math.floor(m.f(stats())) < m.meta || (perfil.rec || {})[m.id]) return true;
     perfil = { ...perfil, rec: { ...perfil.rec, [m.id]: true }, cos: { ...perfil.cos, [m.rec]: true } };
-    await guardaPerfil({ rec: { [m.id]: true }, cos: { [m.rec]: true } }); toast('🎁 ¡Ganaste ' + COS[m.rec].n + '!'); render(); return true;
+    await guardaPerfil({ rec: { [m.id]: true }, cos: { [m.rec]: true } }); toast('¡Ganaste ' + COS[m.rec].n + '!'); render(); return true;
   }
   if (a === 'equipar') {
     const id = t.dataset.id, c = COS[id]; if (!c || !(owner || (perfil.cos || {})[id])) return true;
