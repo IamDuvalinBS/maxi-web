@@ -1,13 +1,13 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const NAV = [['inicio','🏠','Inicio','Menú'],['juegos','🎮','Juegos','Menú'],['pases','🏆','Pases','Menú'],['canjear','🎟️','Canjear','Menú'],['chats','💬','Chats','Social'],['noticias','📰','Noticias','Social'],['perfil','👤','Mi perfil','Social']];
+const NAV = [['inicio','🏠','Inicio','Menú'],['juegos','🎮','Juegos','Menú'],['misiones','🎯','Misiones','Menú'],['pases','🏆','Pases','Menú'],['canjear','🎟️','Canjear','Menú'],['chats','💬','Chats','Social'],['noticias','📰','Noticias','Social'],['perfil','👤','Mi perfil','Social']];
 let fb = null, db = null, user = null, perfil = null, ready = false, pendingName = '', authMode = 'in';
 try { if (window.firebase && C.firebase && C.firebase.apiKey) { firebase.initializeApp(C.firebase); fb = firebase.auth(); db = firebase.firestore(); } } catch (e) { fb = null; db = null; }
 
 const page = () => { const h = location.hash.slice(1); return h.startsWith('chat/') ? 'chat' : h.startsWith('juego/') ? 'juego' : NAV.some(n => n[0] === h) ? h : 'inicio'; };
 const nombre = () => (perfil && perfil.nombre) || (user && (user.displayName || (user.email || '').split('@')[0])) || '';
 const foto = () => (perfil && perfil.avatar) || (user && user.photoURL) || '';
-const avatar = px => `<span class="av" style="width:${px}px;height:${px}px;font-size:${px/2.5}px">${foto() ? `<img src="${esc(foto())}" alt="" referrerpolicy="no-referrer">` : esc((nombre() || '?')[0].toUpperCase())}</span>`;
+const avatar = px => `<span class="av${marcoCls()}" style="width:${px}px;height:${px}px;font-size:${px/2.5}px">${foto() ? `<img src="${esc(foto())}" alt="" referrerpolicy="no-referrer">` : esc((nombre() || '?')[0].toUpperCase())}</span>`;
 const logo = px => `<span class="lg"${px ? ` style="width:${px}px;height:${px}px"` : ''}>${C.logo ? `<img src="${esc(C.logo)}" alt="">` : esc(C.nombre[0])}</span>`;
 const loginBtn = () => `<button class="btn" data-a="login"><img class="gimg" src="img/google.png" alt="" width="20" height="20">Entrar con Google</button>`;
 const empty = (icon, t) => `<div class="em"><div style="font-size:2rem">${icon}</div><p>${t}</p></div>`;
@@ -74,6 +74,7 @@ const PAGES = {
     h += postsView();
     return h;
   },
+  misiones: () => misionesView(),
   chats: () => chatsView(),
   chat: () => chatView(),
   juegos: () => juegosView(),
@@ -81,7 +82,7 @@ const PAGES = {
   pases: () => `<section class="card"><div class="ti">🏆 Pases</div>${empty('🏆', 'No hay pases disponibles todavía. Espera a las próximas actualizaciones.')}</section>`,
   noticias: () => `<section class="card"><div class="ti">📰 Noticias</div>${empty('📰', 'No hay noticias por ahora. Vuelve pronto.')}</section>`,
   canjear: () => user ? `<section class="card"><div class="ti">🎟️ Canjear</div>${empty('🎟️', 'No tienes recompensas por canjear todavía.')}</section>${anunciosView()}` : gate('Entra con Google para ver tus códigos de canje.'),
-  perfil: () => `<section class="card pf"><div class="ti">${avatar(64)}<span>${esc(nombre())} ${owner ? vf() : ''}</span></div>
+  perfil: () => perfilView() + `<section class="card pf"><div class="ti">${avatar(64)}<span>${esc(nombre())} ${owner ? vf() : ''}</span></div>
     <p class="mu">${esc(user.email || '')}</p>
     <p>ID: <b>${esc((perfil && perfil.idn) || '…')}</b></p>
     <label class="btn sec" for="fi">Cambiar foto</label><input id="fi" type="file" accept="image/*" hidden>
@@ -164,4 +165,4 @@ document.addEventListener('change', e => {
   im.onerror = () => toast('No se pudo leer la imagen.');
   im.src = URL.createObjectURL(e.target.files[0]);
 });
-    
+ 
