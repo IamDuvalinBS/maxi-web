@@ -81,14 +81,8 @@ const PAGES = {
   juego: () => juegoView(),
   pases: () => `<section class="card"><div class="ti">🏆 Pases</div>${empty('🏆', 'No hay pases disponibles todavía. Espera a las próximas actualizaciones.')}</section>`,
   noticias: () => `<section class="card"><div class="ti">📰 Noticias</div>${empty('📰', 'No hay noticias por ahora. Vuelve pronto.')}</section>`,
-  canjear: () => user ? `<section class="card"><div class="ti">🎟️ Canjear</div>${empty('🎟️', 'No tienes recompensas por canjear todavía.')}</section>${anunciosView()}` : gate('Entra con Google para ver tus códigos de canje.'),
-  perfil: () => perfilView() + `<section class="card pf"><div class="ti">${avatar(64)}<span>${esc(nombre())} ${owner ? vf() : ''}</span></div>
-    <p class="mu">${esc(user.email || '')}</p>
-    <p>ID: <b>${esc((perfil && perfil.idn) || '…')}</b></p>
-    <label class="btn sec" for="fi">Cambiar foto</label><input id="fi" type="file" accept="image/*" hidden>
-    <label for="nom">Nombre de usuario</label><input id="nom" maxlength="20" value="${esc(nombre())}">
-    <button class="btn" data-a="save">Guardar cambios</button>
-    ${owner ? `<label for="oid">Agregar owner por ID</label><input id="oid" inputmode="numeric" placeholder="ID del usuario"><button class="btn sec" data-a="addowner">Agregar owner</button>` : ''}</section>`
+  canjear: () => user ? `<section class="card"><div class="ti">🎟️ Canjear</div>${empty('🎟️', 'No tienes recompensas por canjear todavía.')}</section>` : gate('Entra con Google para ver tus códigos de canje.'),
+  perfil: () => perfilView() + `<section class="card"><div class="ti">🔒 Cuenta privada</div><p class="mu">Tu correo solo lo ves tú.</p><p>${esc(user.email || '')}</p></section><section class="card pf"><div class="ti">⚙️ Ajustes</div><label for="nom">Nombre de usuario</label><input id="nom" maxlength="20" value="${esc(nombre())}"><button class="btn" data-a="save">Guardar cambios</button>${owner ? `<label for="oid">Agregar owner por ID</label><input id="oid" inputmode="numeric" placeholder="ID del usuario"><button class="btn sec" data-a="addowner">Agregar owner</button>` : ''}</section>`
 };
 function render() {
   document.body.classList.toggle('auth', !!fb && !user);
@@ -165,4 +159,3 @@ document.addEventListener('change', e => {
   im.onerror = () => toast('No se pudo leer la imagen.');
   im.src = URL.createObjectURL(e.target.files[0]);
 });
- 
