@@ -1,27 +1,27 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const NAV = [['inicio','🏠','Inicio','Menú'],['juegos','🎮','Juegos','Menú'],['misiones','🎯','Misiones','Menú'],['pases','🏆','Pases','Menú'],['canjear','🎟️','Canjear','Menú'],['chats','💬','Chats','Social'],['noticias','📰','Noticias','Social'],['perfil','👤','Mi perfil','Social']];
+const NAV = [['inicio','home','Inicio','Menú'],['juegos','game','Juegos','Menú'],['misiones','target','Misiones','Menú'],['pases','trophy','Pases','Menú'],['canjear','ticket','Canjear','Menú'],['chats','chat','Chats','Social'],['noticias','news','Noticias','Social'],['perfil','user','Mi perfil','Social']];
 let fb = null, db = null, user = null, perfil = null, ready = false, pendingName = '', authMode = 'in';
 try { if (window.firebase && C.firebase && C.firebase.apiKey) { firebase.initializeApp(C.firebase); fb = firebase.auth(); db = firebase.firestore(); } } catch (e) { fb = null; db = null; }
 
-const page = () => { const h = location.hash.slice(1); return h.startsWith('chat/') ? 'chat' : h.startsWith('juego/') ? 'juego' : NAV.some(n => n[0] === h) ? h : 'inicio'; };
+const page = () => { const h = location.hash.slice(1); return h.startsWith('chat/') ? 'chat' : h.startsWith('juego/') ? 'juego' : h.startsWith('noticia/') ? 'noticia' : NAV.some(n => n[0] === h) ? h : 'inicio'; };
 const nombre = () => (perfil && perfil.nombre) || (user && (user.displayName || (user.email || '').split('@')[0])) || '';
 const foto = () => (perfil && perfil.avatar) || (user && user.photoURL) || '';
-const avatar = px => `<span class="av${marcoCls()}" style="width:${px}px;height:${px}px;font-size:${px/2.5}px">${foto() ? `<img src="${esc(foto())}" alt="" referrerpolicy="no-referrer">` : esc((nombre() || '?')[0].toUpperCase())}</span>`;
+const avatar = px => `<span class="av${marcoCls()}" style="width:${px}px;height:${px}px;font-size:${px/2.5}px">${foto() ? `<img src="${esc(foto())}" alt="" referrerpolicy="no-referrer">` : inicial(nombre())}</span>`;
 const logo = px => `<span class="lg"${px ? ` style="width:${px}px;height:${px}px"` : ''}>${C.logo ? `<img src="${esc(C.logo)}" alt="">` : esc(C.nombre[0])}</span>`;
 const loginBtn = () => `<button class="btn" data-a="login"><img class="gimg" src="img/google.png" alt="" width="20" height="20">Entrar con Google</button>`;
-const empty = (icon, t) => `<div class="em"><div style="font-size:2rem">${icon}</div><p>${t}</p></div>`;
-const gate = t => `<section class="card"><h2>Inicia sesión</h2><p class="mu">${t}</p>${loginBtn()}</section>`;
+const empty = (icon, t) => `<div class="em"><span class="emi">${ic(icon, 34)}</span><p>${t}</p></div>`;
+const gate = t => `<section class="card gate"><h2>Inicia sesión</h2><p class="mu">${t}</p>${loginBtn()}</section>`;
 
 const brand = () => `<span class="nm">${esc(C.nombre)}</span> <span class="sf">${esc(C.sufijo)}</span>`;
 const ERR = { 'auth/invalid-credential': 'Correo o contraseña incorrectos.', 'auth/wrong-password': 'Correo o contraseña incorrectos.', 'auth/user-not-found': 'Correo o contraseña incorrectos.', 'auth/email-already-in-use': 'Ese correo ya tiene cuenta. Toca Entrar.', 'auth/weak-password': 'La contraseña debe tener 6 caracteres o más.', 'auth/invalid-email': 'Correo no válido.', 'auth/operation-not-allowed': 'Este método no está activado en Firebase.', 'permission-denied': 'No tienes permiso para hacer esto.' };
 const errMsg = e => ERR[e.code] || ('Error: ' + (e.message || e));
-const field = (ic, lb, id, ty, ph) => `<label class="fl2" for="${id}"><span>${ic}</span> ${lb}</label><input id="${id}" type="${ty}" placeholder="${ph}">`;
+const field = (i, lb, id, ty, ph) => `<label class="fl2" for="${id}"><span class="fli">${ic(i, 16)}</span> ${lb}</label><input id="${id}" type="${ty}" placeholder="${ph}">`;
 const authView = () => { const up = authMode === 'up'; return `<section class="auth-card"><div class="alogo">${logo(84)}</div>
   <h1>${up ? 'Crear cuenta' : 'Iniciar sesión'}</h1><p class="mu" style="text-align:center">${up ? 'Regístrate para entrar a ' + brand() : 'Accede a tu cuenta de ' + brand()}</p>
-  ${up ? field('👤', 'Nombre de usuario', 'us', 'text', 'tu_usuario') : ''}${field('✉️', 'Correo', 'em', 'email', 'tu@correo.com')}${field('🔒', 'Contraseña', 'pw', 'password', 'Mínimo 6 caracteres')}${up ? field('✅', 'Confirmar contraseña', 'pw2', 'password', 'Repite la contraseña') : ''}
+  ${up ? field('user', 'Nombre de usuario', 'us', 'text', 'tu_usuario') : ''}${field('mail', 'Correo', 'em', 'email', 'tu@correo.com')}${field('lock', 'Contraseña', 'pw', 'password', 'Mínimo 6 caracteres')}${up ? field('check', 'Confirmar contraseña', 'pw2', 'password', 'Repite la contraseña') : ''}
   <p id="am" class="am" role="alert"></p>
-  <button class="btn big" data-a="${up ? 'mail-up' : 'mail-in'}">${up ? '🚀 Crear cuenta' : 'Iniciar sesión'}</button>
+  <button class="btn big" data-a="${up ? 'mail-up' : 'mail-in'}">${up ? 'Crear cuenta' : 'Iniciar sesión'}</button>
   ${up ? '' : '<p style="text-align:center"><button class="lnk" data-a="reset">¿Olvidaste tu contraseña?</button></p>'}
   <div class="or"><span>${up ? 'O regístrate con' : 'O continúa con'}</span></div>
   <button class="btn sec big" data-a="login"><img class="gimg" src="img/google.png" alt="" width="20" height="20">Google</button>
@@ -52,26 +52,29 @@ async function resetPw() {
 function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 3500); }
 
 function renderSide() {
-  const cur = page();
-  let h = `<div class="sh">${logo()}<b>${brand()}</b><button class="ib x" data-a="close" aria-label="Cerrar menú">✕</button></div>`;
+  const cur = page() === 'noticia' ? 'noticias' : page() === 'chat' ? 'chats' : page();
+  let h = `<div class="sh">${logo()}<b>${brand()}</b><button class="ib x" data-a="close" aria-label="Cerrar menú">${ic('close', 22)}</button></div>`;
   h += user ? `<div class="ub">${avatar(48)}<div><b>${esc(nombre())}${owner ? ' ' + vf() : ''}</b><small>${esc(user.email)}</small></div></div>` : `<div class="ub">${loginBtn()}</div>`;
   let g = '';
-  NAV.forEach(n => { if (n[3] !== g) { g = n[3]; h += `<div class="gl">${g}</div>`; } h += `<a class="nv${n[0] === cur ? ' on' : ''}" href="#${n[0]}"${n[0] === cur ? ' aria-current="page"' : ''}><span>${n[1]}</span>${n[2]}</a>`; });
-  h += `<div class="fl"><button class="nv" data-a="theme"><span>🌓</span>Cambiar tema</button>${user ? `<button class="nv" data-a="logout"><span>🚪</span>Cerrar sesión</button>` : ''}</div>`;
+  NAV.forEach(n => { if (n[3] !== g) { g = n[3]; h += `<div class="gl">${g}</div>`; } h += `<a class="nv${n[0] === cur ? ' on' : ''}" href="#${n[0]}"${n[0] === cur ? ' aria-current="page"' : ''}><span class="nvi">${ic(n[1], 20)}</span>${n[2]}</a>`; });
+  h += `<div class="fl"><button class="nv" data-a="theme"><span class="nvi">${ic('theme', 20)}</span>Cambiar tema</button>${user ? `<button class="nv" data-a="logout"><span class="nvi">${ic('logout', 20)}</span>Cerrar sesión</button>` : ''}</div>`;
   $('#side').innerHTML = h;
 }
 function renderTop() {
-  $('#top').innerHTML = `<button class="ib" id="burger" data-a="open" aria-label="Abrir menú">☰</button>${logo()}<b>${brand()}</b><span class="sp"></span>` +
+  $('#top').innerHTML = `<button class="ib" id="burger" data-a="open" aria-label="Abrir menú">${ic('menu', 26)}</button>${logo()}<b>${brand()}</b><span class="sp"></span>` +
     (user ? `<a href="#perfil" aria-label="Mi perfil">${avatar(40)}</a>` : `<button class="btn sec" style="margin:0;padding:8px 14px" data-a="login">Entrar</button>`);
 }
+const ownersView = () => {
+  const l = ownersL.length ? ownersL : (C.creadores || []).map(c => ({ nombre: c.nombre, avatar: c.foto }));
+  return `<div class="ti">${ic('crown', 24, 'yl')}<span>Owners</span></div><section class="owners">` +
+    (l.length ? l.map(o => `<div class="orb"><div class="rg"><span class="ph">${o.avatar && imgOk(o.avatar) ? `<img src="${esc(o.avatar)}" alt="" referrerpolicy="no-referrer">` : inicial(o.nombre)}</span></div><b>${esc(o.nombre || 'Owner')}</b><small>${ic('crown', 13)}Owner</small></div>`).join('') : `<p class="mu">Todavía no hay owners.</p>`) + `</section>`;
+};
 const PAGES = {
   inicio() {
     let h = '';
     if (!fb) h += `<section class="card note"><h2>Modo demo</h2><p class="mu">Falta conectar Firebase para que funcione el login con Google. Pega tus claves en config.js.</p></section>`;
-    h += user ? `<section class="card"><h2>Hola, ${esc(nombre())}</h2><p class="mu">Qué bueno verte de nuevo.</p></section>` : gate('Entra con Google para guardar tu perfil.');
-    h += `<div class="ti"><span class="ac">&lt;/&gt;</span>Creadores</div><div class="g2">` +
-      C.creadores.map(c => `<div class="card cr"><div class="pic">${c.foto ? `<img src="${esc(c.foto)}" alt="" referrerpolicy="no-referrer">` : esc((c.nombre || '?')[0])}</div><b>${esc(c.nombre)}</b><br><small>${esc(c.rol)}</small></div>`).join('') + `</div>`;
-    h += postsView();
+    h += user ? `<section class="hero"><span class="hi">Hola,</span><h1>${esc(nombre())}</h1><p>Qué bueno verte de nuevo.</p><i class="sh1"></i><i class="sh2"></i><i class="sh3"></i></section>` : gate('Entra con Google para guardar tu perfil.');
+    h += ownersView() + postsView();
     return h;
   },
   misiones: () => misionesView(),
@@ -79,14 +82,20 @@ const PAGES = {
   chat: () => chatView(),
   juegos: () => juegosView(),
   juego: () => juegoView(),
-  pases: () => `<section class="card"><div class="ti">🏆 Pases</div>${empty('🏆', 'No hay pases disponibles todavía. Espera a las próximas actualizaciones.')}</section>`,
-  noticias: () => `<section class="card"><div class="ti">📰 Noticias</div>${empty('📰', 'No hay noticias por ahora. Vuelve pronto.')}</section>`,
-  canjear: () => user ? `<section class="card"><div class="ti">🎟️ Canjear</div>${empty('🎟️', 'No tienes recompensas por canjear todavía.')}</section>` : gate('Entra con Google para ver tus códigos de canje.'),
-  perfil: () => perfilView() + `<section class="card"><div class="ti">🔒 Cuenta privada</div><p class="mu">Tu correo solo lo ves tú.</p><p>${esc(user.email || '')}</p></section><section class="card pf"><div class="ti">⚙️ Ajustes</div><label for="nom">Nombre de usuario</label><input id="nom" maxlength="20" value="${esc(nombre())}"><button class="btn" data-a="save">Guardar cambios</button>${owner ? `<label for="oid">Agregar owner por ID</label><input id="oid" inputmode="numeric" placeholder="ID del usuario"><button class="btn sec" data-a="addowner">Agregar owner</button>` : ''}</section>`
+  noticias: () => noticiasView(),
+  noticia: () => noticiaView(),
+  pases: () => `<section class="card"><div class="ti">${ic('trophy', 24)}<span>Pases</span></div>${empty('trophy', 'No hay pases disponibles todavía. Espera a las próximas actualizaciones.')}</section>`,
+  canjear: () => user ? `<section class="card"><div class="ti">${ic('ticket', 24)}<span>Canjear</span></div>${empty('ticket', 'No tienes recompensas por canjear todavía.')}</section>` : gate('Entra con Google para ver tus códigos de canje.'),
+  perfil: () => perfilView() + `<section class="card"><div class="ti">${ic('lock', 22)}<span>Cuenta privada</span></div><p class="mu">Tu correo solo lo ves tú.</p><p>${esc(user.email || '')}</p></section><section class="card pf"><div class="ti">${ic('gear', 22)}<span>Ajustes</span></div><label for="nom">Nombre de usuario</label><input id="nom" maxlength="20" value="${esc(nombre())}"><button class="btn" data-a="save">Guardar cambios</button>${owner ? `<label for="oid">Agregar owner por ID</label><input id="oid" inputmode="numeric" placeholder="ID del usuario"><button class="btn sec" data-a="addowner">Agregar owner</button>` : ''}</section>`
 };
+function renderFoot() {
+  const f = $('#foot'); if (!f) return;
+  f.textContent = C.derechos || `© ${new Date().getFullYear()} ${C.nombre} ${C.sufijo}. Todos los derechos reservados.`;
+}
 function render() {
   document.body.classList.toggle('auth', !!fb && !user);
   document.body.classList.toggle('inchat', ['chat', 'juego'].includes(page()));
+  document.body.dataset.p = page();
   if (page() === 'juego' && window.JUEGO_ACTIVO === location.hash && $('#jg')) return;
   if (fb && !user) { $('#view').innerHTML = ready ? authView() : ''; return; }
   renderSide(); renderTop(); $('#view').innerHTML = PAGES[page()]();
@@ -99,7 +108,7 @@ async function loadPerfil() {
     const ref = db.collection('perfiles').doc(user.uid), d = await ref.get();
     if (d.exists) { perfil = d.data(); if (!perfil.idn) { perfil.idn = newId(); await ref.set({ idn: perfil.idn }, { merge: true }); } }
     else { perfil = { nombre: (pendingName || nombre()).slice(0, 20), idn: newId() }; await ref.set({ ...perfil, creado: firebase.firestore.FieldValue.serverTimestamp() }); }
-    await checkOwner(); render(); loadPosts(); loadChats();
+    await checkOwner(); await loadOwners(); render(); loadPosts(); loadChats(); loadNews();
   } catch (e) { toast(errMsg(e)); }
 }
 function setUser(u) { user = u || null; perfil = null; render(); if (user) setTimeout(loadPerfil, 0); }
@@ -143,7 +152,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(fals
 window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
 
 try { const s = localStorage.getItem('tema'); if (s) document.documentElement.dataset.theme = s; } catch (_) {}
-render();
+renderFoot(); render();
 if (fb) fb.onAuthStateChanged(u => { ready = true; setUser(u); });
 document.addEventListener('change', e => {
   if (e.target.id !== 'fi' || !e.target.files[0]) return;
