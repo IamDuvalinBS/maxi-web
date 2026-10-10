@@ -127,6 +127,8 @@ const JG = {
   pou: { n: 'Pou Penales', ic: '⚽', d: 'Patea penales, suma puntos y cuida tus vidas.', f: botGame('pou'), bot: 1 },
   dodge: { n: 'Neon Dodge', ic: '🚀', d: 'Esquiva meteoros de neón y junta orbes.', f: botGame('dodge'), bot: 1 },
   egg: { n: 'Roba un huevo', ic: '🥚', d: 'Cría animales y roba huevos.', f: embedGame('egg', PG + 'game/steal-an-egg-grow-animals?clid=' + CLID, 'Roba un huevo'), bot: 1, ext: 1 },
+  gym: { n: 'Gym Simulator: Escape', ic: '🏋️', d: 'Juego patrocinado de Playgama.', f: embedGame('gym', PG + 'game/gym-simulator-online-escape?clid=' + CLID, 'Gym Simulator'), bot: 1, ext: 1 },
+  obby: { n: 'Obby: Digging Power', ic: '⛏️', d: 'Juego patrocinado de Playgama.', f: embedGame('obby', PG + 'game/obby-1-digging-power-per-click?clid=' + CLID, 'Obby Digging Power'), bot: 1, ext: 1 },
   tbworld: { n: 'TB World', ic: '🌐', d: 'Juego patrocinado de Playgama.', f: embedGame('tbworld', PG + 'game/tb-world?clid=' + CLID, 'TB World'), bot: 1, ext: 1 },
   pvz: { n: 'Plants vs Zombies Hybrids', ic: '🌻', d: 'Juego patrocinado de Playgama.', f: embedGame('pvz', PG + 'game/plants-vs-zombies-hybrids?clid=' + CLID, 'Plants vs Zombies Hybrids'), bot: 1, ext: 1 },
   deadly: { n: 'Deadly Descent', ic: '💀', d: 'Juego patrocinado de Playgama.', f: embedGame('deadly', 'https://deadlydescent.net/export?clid=' + CLID, 'Deadly Descent'), bot: 1, ext: 1 },
@@ -152,10 +154,10 @@ function juegoView() {
   setTimeout(startJuego, 0);
   return `<section class="card gamefull" id="jg"><div class="chh"><a href="#juegos" class="ib" aria-label="Volver">←</a><b>${g.ic} ${g.n}</b>${g.ext ? '<button class="ib" style="margin-left:auto;font-size:1rem" data-a="horiz" aria-label="Pantalla horizontal">↻ Horizontal</button>' : `<span class="mu" style="margin-left:auto">Mejor: <b id="jb">${miJuego(k).mejor || 0}</b></span>`}${g.bot ? '' : `<button class="ib" data-a="snd" id="sb" aria-label="Sonido">${SND ? '🔊' : '🔇'}</button>`}</div><div id="ja" class="ja${g.bot ? ' gfw' : ''}"></div><div id="jo" class="jo" hidden><div class="card"><h2 id="jt"></h2><p id="jx"></p><button class="btn" data-a="jrep">▶ Jugar de nuevo</button> <a class="btn sec" href="#juegos">Salir</a></div></div></section>`;
 }
-function stopJuego() { if (J.stop) J.stop(); J.stop = null; window.JUEGO_ACTIVO = null; }
+function stopJuego() { if (J.stop) J.stop(); J.stop = null; window.JUEGO_ACTIVO = null; if (typeof jugadaFin === 'function') jugadaFin(); }
 function startJuego() {
   const id = location.hash.slice(7), g = JG[id], a = $('#ja'); if (!g || !a) return;
-  stopJuego(); J.id = id; window.JUEGO_ACTIVO = location.hash; $('#jo').hidden = true;
+  stopJuego(); J.id = id; window.JUEGO_ACTIVO = location.hash; $('#jo').hidden = true; if (typeof jugadaIniciar === 'function') jugadaIniciar(id);
   try {
     J.stop = g.f(a, terminar);
   } catch (e) { a.innerHTML = `<div class="card" style="margin:16px"><h2>No se pudo abrir el juego</h2><p class="mu">${esc(e.message)}</p></div>`; }
@@ -186,4 +188,3 @@ MODS.push(async a => {
   return false;
 });
 window.addEventListener('hashchange', stopJuego);
-    
