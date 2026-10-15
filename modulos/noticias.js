@@ -38,7 +38,7 @@ function videoThumb(file) {
 // ---------- Lista ----------
 async function loadNews() {
   if (!db) return;
-  try { const s = await db.collection('noticias').orderBy('t', 'desc').limit(40).get(); news = s.docs.map(d => ({ id: d.id, ...d.data() })); nLoaded = true; render(); }
+  try { await leeRapido(db.collection('noticias').orderBy('t', 'desc').limit(20), s => { news = s.docs.map(d => ({ id: d.id, ...d.data() })); nLoaded = true; renderSoon(); }); }
   catch (e) { nLoaded = true; toast(errMsg(e)); }
 }
 function ncard(n) {

@@ -12,6 +12,7 @@ async function loadOwners() {
       if (user && id === user.uid) return { uid: id, nombre: nombre(), avatar: foto() };
       const p = await perfOf(id); return { uid: id, ...p };
     }));
+    renderSoon();
   } catch (e) {
     if (owner && user) { ownerUids = new Set([user.uid]); ownersL = [{ uid: user.uid, nombre: nombre(), avatar: foto() }]; }
   }
@@ -20,7 +21,7 @@ const esOwner = uid => ownerUids.has(uid);
 
 async function loadPosts() {
   if (!db) return;
-  try { const s = await db.collection('posts').orderBy('t', 'desc').limit(40).get(); posts = s.docs.map(d => ({ id: d.id, ...d.data() })); render(); }
+  try { await leeRapido(db.collection('posts').orderBy('t', 'desc').limit(15), s => { posts = s.docs.map(d => ({ id: d.id, ...d.data() })); renderSoon(); }); }
   catch (e) { toast(errMsg(e)); }
 }
 
@@ -59,8 +60,8 @@ function syncPf() {
 document.addEventListener('change', async e => {
   if (e.target.id !== 'pfi' || !e.target.files[0]) return;
   try {
-    const raw = await leeArchivo(e.target.files[0]); let q = .78, img = await comprime(raw, 1100, q);
-    while (img.length > 800000 && q > .4) { q -= .1; img = await comprime(raw, 1000, q); }
+    const raw = await leeArchivo(e.target.files[0]); let q = .72, img = await comprime(raw, 900, q);
+    while (img.length > 450000 && q > .4) { q -= .08; img = await comprime(raw, 800, q); }
     syncPf(); pf.img = img; render(); const f = $('.pform'); if (f) f.scrollIntoView({ block: 'center' });
   } catch (er) { toast(er.message); }
 });

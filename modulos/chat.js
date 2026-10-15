@@ -53,20 +53,23 @@ const getCC = o => ({ col: 'rosa', bm: 'acento', bt: 'cristal', fp: 'defecto', f
 const bubOf = k => BUB.find(b => b[0] === k) || BUB[0];
 const cidOf = o => [user.uid, o].sort().join('_');
 const avOf = (p, px, ring) => `<span class="av${ring ? ' ring' : ''}" style="width:${px}px;height:${px}px;font-size:${px / 2.5}px">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : inicial(p.nombre)}</span>`;
-async function perfOf(uid) {
-  if (!perfs[uid]) { try { const d = await db.collection('perfiles').doc(uid).get(); perfs[uid] = d.exists ? d.data() : { nombre: 'Usuario' }; } catch (e) { perfs[uid] = { nombre: 'Usuario' }; } }
-  return perfs[uid];
+const perfP = {};
+function perfOf(uid) {
+  if (perfs[uid]) return Promise.resolve(perfs[uid]);
+  if (!perfP[uid]) perfP[uid] = db.collection('perfiles').doc(uid).get().then(d => perfs[uid] = d.exists ? d.data() : { nombre: 'Usuario' }).catch(() => perfs[uid] = { nombre: 'Usuario' });
+  return perfP[uid];
 }
-async function loadChats() {
-  if (!db || !user) return;
-  try {
-    const s = await db.collection('chats').where('miembros', 'array-contains', user.uid).get();
-    chats = s.docs.map(d => d.data());
-    for (const c of chats) { c.otro = c.miembros.find(u => u !== user.uid); await perfOf(c.otro); }
+// Lista de chats en vivo: sale al instante desde la caché y se actualiza sola (sin recargar)
+let chatsUnsub = null;
+function loadChats() {
+  if (!db || !user || chatsUnsub) return;
+  chatsUnsub = db.collection('chats').where('miembros', 'array-contains', user.uid).onSnapshot(async s => {
+    const l = s.docs.map(d => d.data({ serverTimestamps: 'estimate' }));
+    l.forEach(c => { c.otro = c.miembros.find(u => u !== user.uid); });
+    await Promise.all(l.map(c => perfOf(c.otro)));          // todos los perfiles a la vez
     const sec = c => (c.ultimo && c.ultimo.t && c.ultimo.t.seconds) || 0;
-    chats.sort((x, y) => sec(y) - sec(x));
-    render();
-  } catch (e) { toast(errMsg(e)); }
+    l.sort((x, y) => sec(y) - sec(x)); chats = l; renderSoon();
+  }, e => toast(errMsg(e)));
 }
 function chatsView() {
   return `<div class="ti">${ic('chat', 24)}<span>Chats</span></div><section class="card"><p class="mu">Para agregar a alguien, pídele su ID (lo ve en su perfil).</p><div class="cmp" style="margin-top:12px"><input id="fid" inputmode="numeric" placeholder="ID de tu amigo" aria-label="ID de tu amigo"><button class="snd" data-a="addfriend" aria-label="Agregar amigo">${ic('userplus', 20)}</button></div></section>` +
@@ -115,7 +118,7 @@ async function startChat() {
   if (unsub && curChat === o) { pintaOpts(); aplicarChat(); draw(); return; }
   if (unsub) unsub();
   curChat = o; msgs = []; oc = { open: false, tab: null, who: 'me' };
-  unsub = db.collection('chats').doc(cidOf(o)).collection('msgs').orderBy('t').limitToLast(200).onSnapshot(s => { msgs = s.docs.map(d => d.data()); draw(); }, e => toast(errMsg(e)));
+  unsub = db.collection('chats').doc(cidOf(o)).collection('msgs').orderBy('t').limitToLast(100).onSnapshot(s => { msgs = s.docs.map(d => d.data()); draw(); }, e => toast(errMsg(e)));
   draw(); loadBg(o);
 }
 function draw() {
