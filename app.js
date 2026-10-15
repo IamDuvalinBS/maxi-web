@@ -4,7 +4,7 @@ const NAV = [['inicio','home','Inicio','Menú'],['juegos','game','Juegos','Menú
 let fb = null, db = null, user = null, perfil = null, ready = false, pendingName = '', authMode = 'in';
 try { if (window.firebase && C.firebase && C.firebase.apiKey) { firebase.initializeApp(C.firebase); fb = firebase.auth(); db = firebase.firestore(); try { db.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch (_) {} } } catch (e) { fb = null; db = null; }
 
-const page = () => { const h = location.hash.slice(1); return h.startsWith('chat/') ? 'chat' : h.startsWith('juego/') ? 'juego' : h.startsWith('noticia/') ? 'noticia' : NAV.some(n => n[0] === h) ? h : 'inicio'; };
+const page = () => { const h = location.hash.slice(1); return h.startsWith('chat/') ? 'chat' : h.startsWith('juego/') ? 'juego' : h.startsWith('noticia/') ? 'noticia' : h.startsWith('u/') ? 'u' : NAV.some(n => n[0] === h) ? h : 'inicio'; };
 const nombre = () => (perfil && perfil.nombre) || (user && (user.displayName || (user.email || '').split('@')[0])) || '';
 const foto = () => (perfil && perfil.avatar) || (user && user.photoURL) || '';
 const avatar = px => `<span class="av${marcoCls()}" style="width:${px}px;height:${px}px;font-size:${px/2.5}px">${foto() ? `<img src="${esc(foto())}" alt="" referrerpolicy="no-referrer">` : inicial(nombre())}</span>`;
@@ -67,7 +67,7 @@ function renderTop() {
 const ownersView = () => {
   const l = ownersL.length ? ownersL : (C.creadores || []).map(c => ({ nombre: c.nombre, avatar: c.foto }));
   return `<div class="ti">${ic('crown', 24, 'yl')}<span>Owners</span></div><section class="owners">` +
-    (l.length ? l.map(o => `<div class="orb"><div class="rg"><span class="ph">${o.avatar && imgOk(o.avatar) ? `<img src="${esc(o.avatar)}" alt="" referrerpolicy="no-referrer">` : inicial(o.nombre)}</span></div><b>${esc(o.nombre || 'Owner')}</b><small>${ic('crown', 13)}Owner</small></div>`).join('') : `<p class="mu">Todavía no hay owners.</p>`) + `</section>`;
+    (l.length ? l.map(o => `<${o.uid ? 'a' : 'div'} class="orb"${o.uid ? ` href="#u/${esc(o.uid)}"` : ''}><div class="rg"><span class="ph">${o.avatar && imgOk(o.avatar) ? `<img src="${esc(o.avatar)}" alt="" referrerpolicy="no-referrer">` : inicial(o.nombre)}</span></div><b>${esc(o.nombre || 'Owner')}</b><small>${ic('crown', 13)}Owner</small></${o.uid ? 'a' : 'div'}>`).join('') : `<p class="mu">Todavía no hay owners.</p>`) + `</section>`;
 };
 const PAGES = {
   inicio() {
@@ -84,6 +84,7 @@ const PAGES = {
   juego: () => juegoView(),
   noticias: () => noticiasView(),
   noticia: () => noticiaView(),
+  u: () => publicoView(),
   pases: () => `<section class="card"><div class="ti">${ic('trophy', 24)}<span>Pases</span></div>${empty('trophy', 'No hay pases disponibles todavía. Espera a las próximas actualizaciones.')}</section>`,
   canjear: () => user ? `<section class="card"><div class="ti">${ic('ticket', 24)}<span>Canjear</span></div>${empty('ticket', 'No tienes recompensas por canjear todavía.')}</section>` : gate('Entra con Google para ver tus códigos de canje.'),
   perfil: () => perfilView() + `<section class="card"><div class="ti">${ic('lock', 22)}<span>Cuenta privada</span></div><p class="mu">Tu correo solo lo ves tú.</p><p>${esc(user.email || '')}</p></section><section class="card pf"><div class="ti">${ic('gear', 22)}<span>Ajustes</span></div><label for="nom">Nombre de usuario</label><input id="nom" maxlength="20" value="${esc(nombre())}"><button class="btn" data-a="save">Guardar cambios</button>${owner ? `<label for="oid">Agregar owner por ID</label><input id="oid" inputmode="numeric" placeholder="ID del usuario"><button class="btn sec" data-a="addowner">Agregar owner</button>` : ''}</section>`
@@ -97,8 +98,12 @@ function render() {
   document.body.classList.toggle('inchat', ['chat', 'juego'].includes(page()));
   document.body.dataset.p = page();
   if (page() === 'juego' && window.JUEGO_ACTIVO === location.hash && $('#jg')) return;
-  if (fb && !user) { $('#view').innerHTML = ready ? authView() : ''; return; }
-  renderSide(); renderTop(); $('#view').innerHTML = PAGES[page()]();
+  const v = $('#view');
+  if (fb && !user) { v._h = null; v.innerHTML = ready ? authView() : ''; return; }
+  renderSide(); renderTop();
+  const h = PAGES[page()]();
+  if (v._h === h) return;           // nada cambió: no se vuelve a dibujar (evita tirones)
+  v._h = h; v.innerHTML = h;
 }
 
 const newId = () => String(Math.floor(1e9 + Math.random() * 9e9));

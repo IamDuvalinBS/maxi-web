@@ -276,3 +276,21 @@ input[type=checkbox]{flex:none;width:20px;height:20px;padding:0;accent-color:var
 .msgs,.pan,.opts,.ja{overscroll-behavior:contain}
 .msgs,.pan,.opts{will-change:scroll-position}
 img{content-visibility:auto}
+
+/* ===== Perfil público, palomitas, avisos ===== */
+.avl{display:inline-flex;border-radius:50%;flex:none}
+a.pl,span.pl{display:inline-flex;align-items:center;gap:8px;color:inherit}a.pl:active{opacity:.7}
+.chn{min-width:0;overflow:hidden}.chm{min-width:0;flex:1;display:block}
+.chr b{display:inline}.chr small{display:block}
+.chr small.new{color:var(--tx);font-weight:800}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--g);box-shadow:0 0 10px var(--c1);flex:none}
+a.orb{color:inherit}a.orb:active{transform:scale(.96)}
+.tk{display:inline-flex;margin-left:5px;vertical-align:-3px;opacity:.8}
+.tk.v{color:#4fc3f7;opacity:1;filter:drop-shadow(0 0 1.5px #000b)}
+.stm img{height:min(34vw,128px)}
+.pr .row{justify-content:center}
+.pjl{display:grid;gap:4px;margin-top:6px}
+/* Mientras juegas: se apaga lo que no se usa para que el juego tenga toda la potencia */
+body[data-p=juego]::before,body[data-p=juego] header,body[data-p=juego] #foot{display:none}
+@media(max-width:899px){body[data-p=juego] #side,body[data-p=juego] #scrim{display:none}}
+button.back{background:none;border:0;font:inherit;cursor:pointer}
