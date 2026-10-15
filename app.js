@@ -2,7 +2,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const NAV = [['inicio','home','Inicio','Menú'],['juegos','game','Juegos','Menú'],['misiones','target','Misiones','Menú'],['pases','trophy','Pases','Menú'],['canjear','ticket','Canjear','Menú'],['chats','chat','Chats','Social'],['noticias','news','Noticias','Social'],['perfil','user','Mi perfil','Social']];
 let fb = null, db = null, user = null, perfil = null, ready = false, pendingName = '', authMode = 'in';
-try { if (window.firebase && C.firebase && C.firebase.apiKey) { firebase.initializeApp(C.firebase); fb = firebase.auth(); db = firebase.firestore(); } } catch (e) { fb = null; db = null; }
+try { if (window.firebase && C.firebase && C.firebase.apiKey) { firebase.initializeApp(C.firebase); fb = firebase.auth(); db = firebase.firestore(); try { db.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch (_) {} } } catch (e) { fb = null; db = null; }
 
 const page = () => { const h = location.hash.slice(1); return h.startsWith('chat/') ? 'chat' : h.startsWith('juego/') ? 'juego' : h.startsWith('noticia/') ? 'noticia' : NAV.some(n => n[0] === h) ? h : 'inicio'; };
 const nombre = () => (perfil && perfil.nombre) || (user && (user.displayName || (user.email || '').split('@')[0])) || '';
@@ -102,16 +102,29 @@ function render() {
 }
 
 const newId = () => String(Math.floor(1e9 + Math.random() * 9e9));
+// Lee primero la caché del dispositivo (instantáneo) y luego el servidor (actualizado)
+async function leeRapido(q, cb) {
+  try { const c = await q.get({ source: 'cache' }); if (!c.empty) cb(c); } catch (_) {}
+  cb(await q.get());
+}
+let rq = 0;
+function renderSoon() { // junta varios render() seguidos en uno y no borra lo que la persona está escribiendo
+  cancelAnimationFrame(rq);
+  rq = requestAnimationFrame(() => { const a = document.activeElement; if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName)) return; render(); });
+}
 async function loadPerfil() {
   if (!db || !user) return;
+  const ref = db.collection('perfiles').doc(user.uid);
   try {
-    const ref = db.collection('perfiles').doc(user.uid), d = await ref.get();
+    try { const c = await ref.get({ source: 'cache' }); if (c.exists) { perfil = c.data(); render(); } } catch (_) {}
+    loadPosts(); loadChats(); loadNews(); loadOwners();           // todo en paralelo
+    const [d] = await Promise.all([ref.get(), checkOwner()]);
     if (d.exists) { perfil = d.data(); if (!perfil.idn) { perfil.idn = newId(); await ref.set({ idn: perfil.idn }, { merge: true }); } }
     else { perfil = { nombre: (pendingName || nombre()).slice(0, 20), idn: newId() }; await ref.set({ ...perfil, creado: firebase.firestore.FieldValue.serverTimestamp() }); }
-    await checkOwner(); await loadOwners(); render(); loadPosts(); loadChats(); loadNews();
+    render();
   } catch (e) { toast(errMsg(e)); }
 }
-function setUser(u) { user = u || null; perfil = null; render(); if (user) setTimeout(loadPerfil, 0); }
+function setUser(u) { user = u || null; perfil = null; if (chatsUnsub) { chatsUnsub(); chatsUnsub = null; } chats = []; render(); if (user) setTimeout(loadPerfil, 0); }
 
 const setMenu = on => document.body.classList.toggle('menu', on);
 document.addEventListener('click', async e => {
@@ -168,3 +181,5 @@ document.addEventListener('change', e => {
   im.onerror = () => toast('No se pudo leer la imagen.');
   im.src = URL.createObjectURL(e.target.files[0]);
 });
+
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) navigator.serviceWorker.register('sw.js').catch(() => {});
