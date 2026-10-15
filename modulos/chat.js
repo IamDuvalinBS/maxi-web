@@ -14,7 +14,7 @@ const COLS = [
 // [clave, nombre, fondo, color de texto, css extra]  -> "Mensajes"
 const BUB = [
   ['acento', 'Color del chat', 'var(--g)', '#fff'],
-  ['cristal', 'Cristal', '#ffffff24', '#fff', 'backdrop-filter:blur(6px)'],
+  ['cristal', 'Cristal', '#ffffff24', '#fff'],
   ['blanco', 'Blanco', '#ffffff', '#1b1233'],
   ['noche', 'Noche', '#0d0a1f', '#fff'],
   ['chicle', 'Chicle', 'linear-gradient(135deg,#ff2e9a,#ff7ac6)', '#fff'],
