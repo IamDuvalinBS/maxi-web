@@ -30,9 +30,9 @@ function postHtml(p) {
   const larga = (p.texto || '').length > 140 || (p.texto || '').split('\n').length > 3;
   const b = p.btn && urlOk(p.btn.u) ? `<a class="btn dl" href="${esc(p.btn.u)}" target="_blank" rel="noopener noreferrer">${ic('download', 18)}${esc(p.btn.t || 'Abrir enlace')}</a>` : '';
   return `<article class="dest${p.pin ? ' fix' : ''}">${p.pin ? `<div class="fijado">${ic('pin', 15)}Fijado</div>` : ''}
-    ${p.img && imgOk(p.img) ? `<img class="dimg" src="${esc(p.img)}" alt="" loading="lazy">` : ''}
+    ${p.img && imgOk(p.img) ? `<img class="dimg" src="${esc(p.img)}" alt="" loading="lazy" decoding="async">` : ''}
     <div class="dbody">${p.titulo ? `<h3>${esc(p.titulo)}</h3>` : ''}
-      <div class="dmeta"><span class="dav">${inicial(p.autor)}</span><span>${esc(p.autor)}</span>${vf()}<time>${fechaDe(p.t)}</time></div>
+      <div class="dmeta">${perfLink(p.uid, `<span class="dav">${inicial(p.autor)}</span><span>${esc(p.autor)}</span>`)}${vf()}<time>${fechaDe(p.t)}</time></div>
       ${p.texto ? `<p class="dtx${larga ? ' clamp' : ''}">${esc(p.texto)}</p>` : ''}
       <div class="row">${larga ? `<button class="btn sec sm" data-a="dmas">Ver más</button>` : ''}${b}</div>
       ${owner ? `<div class="dtools">${toolBtn('pin', 'pin', p.pin ? 'Quitar de arriba' : 'Fijar arriba', p.id)}${toolBtn('edit', 'edit', 'Editar', p.id)}${toolBtn('del', 'trash', 'Eliminar', p.id)}</div>` : ''}

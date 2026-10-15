@@ -73,14 +73,18 @@ function loadChats() {
 }
 function chatsView() {
   return `<div class="ti">${ic('chat', 24)}<span>Chats</span></div><section class="card"><p class="mu">Para agregar a alguien, pídele su ID (lo ve en su perfil).</p><div class="cmp" style="margin-top:12px"><input id="fid" inputmode="numeric" placeholder="ID de tu amigo" aria-label="ID de tu amigo"><button class="snd" data-a="addfriend" aria-label="Agregar amigo">${ic('userplus', 20)}</button></div></section>` +
-    (chats.length ? chats.map(c => { const p = perfs[c.otro] || {}; const u = c.ultimo || {}; return `<a class="card chr" href="#chat/${esc(c.otro)}">${avOf(p, 52, 1)}<div><b>${esc(p.nombre)}</b>${esc_o(c.otro)}<small class="mu">${u.tp === 's' ? 'Sticker' : esc(u.tx || 'Sin mensajes todavía')}</small></div></a>`; }).join('')
+    (chats.length ? chats.map(c => {
+      const p = perfs[c.otro] || {}, u = c.ultimo || {}, vi = (c.vistos || {})[user.uid];
+      const nuevo = !!(u.de && u.de !== user.uid && u.t && u.t.seconds && (!vi || (vi.seconds || 0) < u.t.seconds));
+      return `<div class="card chr"><a class="avl" href="#u/${esc(c.otro)}" aria-label="Ver perfil de ${esc(p.nombre)}">${avOf(p, 52, 1)}</a><a class="chm" href="#chat/${esc(c.otro)}"><b>${esc(p.nombre)}</b>${esc_o(c.otro)}<small class="${nuevo ? 'new' : 'mu'}">${u.tp === 's' ? 'Sticker' : esc(u.tx || 'Sin mensajes todavía')}</small></a>${nuevo ? '<span class="dot" aria-label="Mensaje nuevo"></span>' : ''}</div>`;
+    }).join('')
       : `<section class="card">${empty('chat', 'No tienes chats todavía. Agrega a un amigo con su ID.')}</section>`);
 }
 const esc_o = uid => (typeof esOwner === 'function' && esOwner(uid)) ? ' ' + vf() : '';
 function chatView() {
   const p = perfs[otro()];
   setTimeout(startChat, 0);
-  return `<section class="chatfull" id="cf"><div class="chh"><a href="#chats" class="ib" aria-label="Volver">${ic('back', 26)}</a>${avOf(p || {}, 44, 1)}<b>${esc((p && p.nombre) || 'Chat')}${esc_o(otro())}</b><button class="ib pal" data-a="tema" aria-label="Personalizar chat" style="margin-left:auto">${ic('palette', 28)}</button></div>
+  return `<section class="chatfull" id="cf"><div class="chh"><a href="#chats" class="ib" aria-label="Volver">${ic('back', 26)}</a><a class="avl" href="#u/${esc(otro())}" aria-label="Ver perfil">${avOf(p || {}, 44, 1)}</a><a class="chn" href="#u/${esc(otro())}"><b>${esc((p && p.nombre) || 'Chat')}${esc_o(otro())}</b></a><button class="ib pal" data-a="tema" aria-label="Personalizar chat" style="margin-left:auto">${ic('palette', 28)}</button></div>
     <div id="tm" class="opts" hidden></div><div id="msgs" class="msgs"></div><div id="pan" class="pan" hidden></div>
     <div class="cmp"><button class="ib stb" data-a="pan" aria-label="Stickers">${ic('sticker', 30)}</button><input id="cm" maxlength="500" placeholder="Escribe un mensaje" aria-label="Mensaje" autocomplete="off"><button class="snd" data-a="send" aria-label="Enviar">${ic('send', 22)}</button></div></section>`;
 }
@@ -113,29 +117,45 @@ async function setCC(patch) {
   pintaOpts(); aplicarChat(); draw();
   guardaPerfil({ cc: { [o]: c } });
 }
+let chatUn = null, vistoOtro = 0, miVisto = 0;
 async function startChat() {
   const o = otro(); if (!db || !user || !o) return;
   if (unsub && curChat === o) { pintaOpts(); aplicarChat(); draw(); return; }
-  if (unsub) unsub();
-  curChat = o; msgs = []; oc = { open: false, tab: null, who: 'me' };
-  unsub = db.collection('chats').doc(cidOf(o)).collection('msgs').orderBy('t').limitToLast(100).onSnapshot(s => { msgs = s.docs.map(d => d.data()); draw(); }, e => toast(errMsg(e)));
+  if (unsub) unsub(); if (chatUn) chatUn();
+  curChat = o; msgs = []; vistoOtro = 0; miVisto = 0; oc = { open: false, tab: null, who: 'me' };
+  const cref = db.collection('chats').doc(cidOf(o));
+  unsub = cref.collection('msgs').orderBy('t').limitToLast(100).onSnapshot(s => { msgs = s.docs.map(d => d.data()); draw(); marcaVisto(); }, e => toast(errMsg(e)));
+  // cuándo vio el otro los mensajes (para las palomitas)
+  chatUn = cref.onSnapshot(s => { const v = ((s.data() || {}).vistos || {})[o], n = v && v.seconds ? v.seconds * 1000 : 0; if (n !== vistoOtro) { vistoOtro = n; if (msgs.length) draw(); } }, () => {});
   draw(); loadBg(o);
 }
+// Avisa que ya viste los mensajes del otro
+function marcaVisto() {
+  if (document.hidden || !curChat || !user || !db) return;
+  let ult = 0; for (const m of msgs) if (m.de !== user.uid && m.t && m.t.seconds) ult = Math.max(ult, m.t.seconds * 1000);
+  if (ult && ult > miVisto) { miVisto = ult; db.collection('chats').doc(cidOf(curChat)).set({ vistos: { [user.uid]: firebase.firestore.FieldValue.serverTimestamp() } }, { merge: true }).catch(() => {}); }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) marcaVisto(); });
+const pega = el => { el.scrollTop = el.scrollHeight; requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; }); };
+const palomita = m => { if (m.de !== user.uid) return ''; const v = !!(m.t && m.t.seconds && m.t.seconds * 1000 <= vistoOtro); return `<span class="tk${v ? ' v' : ''}" role="img" aria-label="${v ? 'Visto' : 'Enviado'}">${ic(v ? 'check2' : 'check', 15)}</span>`; };
 function draw() {
   const el = $('#msgs'); if (!el) return;
   aplicarChat();
-  if (!el._ro && window.ResizeObserver) { el._ro = new ResizeObserver(() => { el.scrollTop = el.scrollHeight; }); el._ro.observe(el); }
+  if (!el._ev) { // se prepara una sola vez: seguir abajo mientras cargan imágenes y al cambiar el tamaño
+    el._ev = 1;
+    el.addEventListener('scroll', () => { el._peg = el.scrollHeight - el.scrollTop - el.clientHeight < 90; }, { passive: true });
+    el.addEventListener('load', () => { if (el._peg !== false) el.scrollTop = el.scrollHeight; }, true);
+    if (window.ResizeObserver) new ResizeObserver(() => { if (el._peg !== false) el.scrollTop = el.scrollHeight; }).observe(el);
+  }
+  const peg = el._peg !== false, ult = msgs[msgs.length - 1];
   const c = getCC(otro()), sm = bubOf(c.bm), st = bubOf(c.bt);
   const sty = b => `background:${b[2]};color:${b[3]};${b[4] || ''}`;
   el.innerHTML = msgs.length ? msgs.map(m => {
-    const h = horaDe(m.t), me = m.de === user.uid ? ' me' : '';
-    if (m.tp === 's') {
-      if (m.src) return stkOk(m.src) ? `<div class="stm${me}"><img src="${esc(m.src)}" alt="Sticker"><small>${h}</small></div>` : '';
-      return `<div class="bub${me}" style="${sty(me ? sm : st)}">${esc(m.tx)}<small>${h}</small></div>`;
-    }
+    const h = horaDe(m.t) + palomita(m), me = m.de === user.uid ? ' me' : '';
+    if (m.tp === 's' && m.src) return stkOk(m.src) ? `<div class="stm${me}"><img src="${esc(m.src)}" alt="Sticker" width="128" height="128"><small>${h}</small></div>` : '';
     return `<div class="bub${me}" style="${sty(me ? sm : st)}">${esc(m.tx)}<small>${h}</small></div>`;
   }).join('') : `<p class="mu vacio">${ic('chat', 30)}<span>Escribe el primer mensaje</span></p>`;
-  el.scrollTop = el.scrollHeight;
+  if (peg || !el._pos || (ult && ult.de === user.uid)) { el._pos = 1; el._peg = true; pega(el); }
 }
 // m = { tx, tp:'t' } o { src, tp:'s' }
 async function enviar(m) {
@@ -144,7 +164,7 @@ async function enviar(m) {
   const doc = { de: user.uid, tp: m.tp, t: ts }; if (m.tx) doc.tx = m.tx; if (m.src) doc.src = m.src;
   try {
     await ref.collection('msgs').add(doc);
-    await ref.set({ ultimo: { tx: m.tp === 's' ? 'Sticker' : m.tx, tp: m.tp, t: ts } }, { merge: true });
+    await ref.set({ ultimo: { tx: m.tp === 's' ? 'Sticker' : m.tx, tp: m.tp, t: ts, de: user.uid } }, { merge: true });
   } catch (e) { toast(errMsg(e)); }
 }
 document.addEventListener('change', async e => {
@@ -188,4 +208,4 @@ MODS.push(async (a, t) => {
   return false;
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'cm') { e.preventDefault(); document.querySelector('[data-a=send]').click(); } });
-window.addEventListener('hashchange', () => { if (!location.hash.startsWith('#chat/') && unsub) { unsub(); unsub = null; curChat = null; } });
+window.addEventListener('hashchange', () => { if (!location.hash.startsWith('#chat/') && unsub) { unsub(); unsub = null; curChat = null; if (chatUn) { chatUn(); chatUn = null; } } });

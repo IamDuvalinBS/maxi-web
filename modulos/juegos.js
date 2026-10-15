@@ -53,10 +53,10 @@ function botGame(id) {
     return () => { vivo = false; if (on) window.removeEventListener('message', on); if (f) f.remove(); J.frame = null; };
   };
 }
-async function guardarExt(id, min) {
-  if (min < 0.1 || !db || !user) return;
-  const j = { ...(perfil && perfil.juegos) }, p = j[id] || {};
-  j[id] = { ...p, partidas: (p.partidas || 0) + 1, minutos: Math.round(((p.minutos || 0) + min) * 10) / 10, ultima: Date.now() };
+async function guardarExt(id, min, sumar = true) {
+  if (min < 0.05 || !db || !user) return;
+  const j = { ...(perfil && perfil.juegos) }, p = j[id] || {}, pj = (typeof stats === 'function' && stats().pj[id]) || 0;
+  j[id] = { ...p, partidas: (p.partidas || 0) + (sumar ? 1 : 0), minutos: Math.round(Math.max((p.minutos || 0) + min, pj) * 10) / 10, ultima: Date.now() };
   perfil = { ...perfil, juegos: j };
   try { await db.collection('perfiles').doc(user.uid).set({ juegos: { [id]: j[id] } }, { merge: true }); } catch (e) {}
 }
@@ -65,13 +65,17 @@ function embedGame(id, url, nombre) {
     const f = document.createElement('iframe');
     f.className = 'gf'; f.src = url; f.title = nombre; f.setAttribute('allow', 'autoplay; fullscreen; gamepad; clipboard-write'); f.setAttribute('allowfullscreen', '');
     a.innerHTML = ''; a.appendChild(f);
-    let t0 = Date.now(), ms = 0, vis = !document.hidden;
-    const onv = () => { const n = Date.now(); if (vis) ms += n - t0; t0 = n; vis = !document.hidden; };
-    document.addEventListener('visibilitychange', onv);
+    let t0 = Date.now(), ms = 0, vis = !document.hidden, contada = false;
+    const acum = () => { const n = Date.now(); if (vis) ms += n - t0; t0 = n; vis = !document.hidden; };
+    // guarda el tiempo cada 30 s, al ocultar la página y al cerrarla (antes solo se guardaba al salir del juego)
+    const vuelca = () => { acum(); const m = ms / 60000; if (m >= 0.05) { ms = 0; guardarExt(id, m, !contada); contada = true; } };
+    const onv = () => { acum(); if (document.hidden) vuelca(); };
+    const iv = setInterval(vuelca, 30000);
+    document.addEventListener('visibilitychange', onv); window.addEventListener('pagehide', vuelca);
     return () => {
-      document.removeEventListener('visibilitychange', onv); onv(); f.remove();
+      clearInterval(iv); document.removeEventListener('visibilitychange', onv); window.removeEventListener('pagehide', vuelca);
+      vuelca(); f.remove();
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-      guardarExt(id, ms / 60000);
     };
   };
 }
@@ -139,8 +143,8 @@ const JG = {
 const miJuego = k => ((perfil && perfil.juegos) || {})[k] || {};
 function juegosView() {
   const tarjeta = k => {
-    const g = JG[k], s = miJuego(k);
-    const info = g.ext ? (s.partidas ? `Jugado ${s.partidas} ${s.partidas === 1 ? 'vez' : 'veces'} · ${s.minutos} min` : 'Juego patrocinado') : `Mejor: <b>${s.mejor || 0}</b>${s.partidas ? ' · Partidas: ' + s.partidas : ''}`;
+    const g = JG[k], s = miJuego(k), mins = Math.floor(Math.max(s.minutos || 0, (typeof stats === 'function' && stats().pj[k]) || 0));
+    const info = g.ext ? ((s.partidas || mins) ? `Jugado ${s.partidas || 1} ${(s.partidas || 1) === 1 ? 'vez' : 'veces'} · ${mins} min` : 'Juego patrocinado') : `Mejor: <b>${s.mejor || 0}</b>${s.partidas ? ' · Partidas: ' + s.partidas : ''}`;
     return `<a class="card chr" href="#juego/${k}"><span class="gic">${ic(g.ic, 30)}</span><div><b>${g.n}</b><small class="mu">${g.d}</small><small>${info}</small></div></a>`;
   };
   const ks = Object.keys(JG);

@@ -44,7 +44,7 @@ async function loadNews() {
 function ncard(n) {
   const tg = tagOf(n.tag), th = n.thumb && imgOk(n.thumb);
   const chip = n.tp === 'video' ? `<span class="nchip">${ic('play', 13)}vídeo</span>` : n.tp === 'gif' ? `<span class="nchip">GIF</span>` : '';
-  return `<a class="nc" href="#noticia/${esc(n.id)}"><div class="nt${th ? '' : ' tx'}"${th ? '' : ` style="background:${gradDe(n.titulo)}"`}>${th ? `<img src="${esc(n.thumb)}" alt="" loading="lazy">` : (n.tp === 'video' ? ic('play', 40) : ic('text', 38))}${chip}</div>
+  return `<a class="nc" href="#noticia/${esc(n.id)}"><div class="nt${th ? '' : ' tx'}"${th ? '' : ` style="background:${gradDe(n.titulo)}"`}>${th ? `<img src="${esc(n.thumb)}" alt="" loading="lazy" decoding="async">` : (n.tp === 'video' ? ic('play', 40) : ic('text', 38))}${chip}</div>
     <div class="nb">${tg ? `<span class="ntag" style="background:${tg[2]}">${tg[1]}</span>` : ''}<h3>${esc(n.titulo)}</h3><div class="ns"><span>${ic('eye', 16)}${n.vistas || 0}</span><span>${ic('comment', 16)}${n.ncom || 0}</span></div></div></a>`;
 }
 function noticiasView() {
@@ -124,7 +124,7 @@ function pintaArt() {
   let media = '';
   if (d.url) {
     const e = embedUrl(d.url);
-    if (e && e.yt) media = `<div class="yt"><iframe src="https://www.youtube-nocookie.com/embed/${e.yt}" title="Video" loading="lazy" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
+    if (e && e.yt) media = `<div class="yt"><iframe src="https://www.youtube-nocookie.com/embed/${e.yt}" title="Video" loading="lazy" decoding="async" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
     else if (e && e.dir) media = `<video class="nmedia" src="${esc(e.dir)}" controls playsinline preload="metadata"${th ? ` poster="${esc(th)}"` : ''}></video>`;
   } else if (d.np) {
     if (d.tp === 'video') media = nd.media ? `<video class="nmedia" src="${nd.media}" controls playsinline${th ? ` poster="${esc(th)}"` : ''}></video>` : `<div class="nload">${th ? `<img src="${esc(th)}" alt="">` : ''}<span>Cargando video…</span></div>`;
@@ -132,7 +132,7 @@ function pintaArt() {
   }
   const tg = tagOf(d.tag), mio = user && (d.uid === user.uid || owner);
   el.innerHTML = `<article class="card ndet">${media}<div class="nbody">${tg ? `<span class="ntag" style="background:${tg[2]}">${tg[1]}</span>` : ''}<h1>${esc(d.titulo)}</h1>
-    <div class="dmeta"><span class="dav">${inicial(d.autor)}</span><span>${esc(d.autor)}</span>${esOwner(d.uid) ? vf() : ''}<time>${fechaDe(d.t)}</time>
+    <div class="dmeta">${perfLink(d.uid, `<span class="dav">${inicial(d.autor)}</span><span>${esc(d.autor)}</span>`)}${esOwner(d.uid) ? vf() : ''}<time>${fechaDe(d.t)}</time>
     <span class="nsm"><span>${ic('eye', 16)}${d.vistas || 0}</span></span></div>
     ${d.texto ? `<p class="dtx full">${esc(d.texto)}</p>` : ''}${mio ? `<div class="row"><button class="btn sec sm" data-a="ndel">${ic('trash', 16)}Eliminar</button></div>` : ''}</div></article>`;
 }
@@ -144,7 +144,7 @@ function pintaReac() {
 function pintaCom() {
   const el = $('#nlist'); if (!el || !nd) return;
   const c = $('#ncnt'); if (c) c.textContent = nd.com.length ? '(' + nd.com.length + ')' : '';
-  el.innerHTML = nd.com.length ? nd.com.map(x => { const p = perfs[x.uid] || {}; return `<div class="cm">${avOf(p, 38)}<div class="cb2"><div class="cn"><b>${esc(x.autor || p.nombre)}</b>${esOwner(x.uid) ? vf() : ''}<small>${fechaDe(x.t)} ${horaDe(x.t)}</small>${user && (x.uid === user.uid || owner) ? `<button class="tb2 sm" data-a="ncdel" data-id="${esc(x.id)}" aria-label="Eliminar comentario">${ic('trash', 14)}</button>` : ''}</div><p>${esc(x.tx)}</p></div></div>`; }).join('')
+  el.innerHTML = nd.com.length ? nd.com.map(x => { const p = perfs[x.uid] || {}; return `<div class="cm">${perfLink(x.uid, avOf(p, 38))}<div class="cb2"><div class="cn">${perfLink(x.uid, `<b>${esc(x.autor || p.nombre)}</b>`)}${esOwner(x.uid) ? vf() : ''}<small>${fechaDe(x.t)} ${horaDe(x.t)}</small>${user && (x.uid === user.uid || owner) ? `<button class="tb2 sm" data-a="ncdel" data-id="${esc(x.id)}" aria-label="Eliminar comentario">${ic('trash', 14)}</button>` : ''}</div><p>${esc(x.tx)}</p></div></div>`; }).join('')
     : `<p class="mu vacio">${ic('comment', 26)}<span>Aún no hay comentarios. Escribe el primero.</span></p>`;
 }
 async function abreNoticia(id) {

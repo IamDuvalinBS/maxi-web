@@ -39,6 +39,7 @@ const IC = {
   lock: '<rect x="5" y="10" width="14" height="11" rx="2.500"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
   gift: '<rect x="3" y="9" width="18" height="12" rx="2"/><path d="M3 13h18M12 9v12"/><path d="M12 9C9 9 7 8 7 6s3-2.500 5 3c2-5.500 5-5 5-3s-2 3-5 3z"/>',
   chart: '<path d="M5 20V11M11 20V4M17 20v-6M3 20h18"/>',
+  check2: '<path d="M2 12.500l4 4L15 7M10 14.500l2 2L21 7"/>',
   check: '<path d="M5 12.500l4.500 4.500L19 7.500"/>',
   crown: '!<path d="M3 7.500l4.600 4 4.400-6.700 4.400 6.700 4.600-4L19 19H5z"/>',
   tv: '<rect x="3" y="5" width="18" height="12" rx="2.500"/><path d="M8 21h8M12 17v4"/>',
@@ -92,3 +93,5 @@ const horaDe = t => (t && t.toDate) ? t.toDate().toLocaleTimeString([], { hour: 
 const urlOk = u => /^https?:\/\/[^\s]+$/i.test(u || '');
 const imgOk = s => /^(data:image\/(png|jpe?g|webp|gif|svg\+xml);base64,|https:\/\/|img\/)/i.test(s || '');
 const inicial = n => esc((n || '?').trim()[0] || '?').toUpperCase();
+
+const perfLink = (uid, inner) => uid ? `<a class="pl" href="#u/${esc(uid)}">${inner}</a>` : `<span class="pl">${inner}</span>`;
