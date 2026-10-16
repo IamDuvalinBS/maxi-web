@@ -37,6 +37,8 @@ function cargaBot(id) {
       throw new Error(`El archivo modulos/juegos/${id}.js está incompleto o dañado.${det} Vuelve a subirlo.`);
     });
 }
+// Ajusta cada juego a la pantalla: si es más alto/ancho que el teléfono, se reduce (sin barras de deslizar)
+const FIT = `<style>html{height:100%;overflow:hidden}body{transform-origin:top center}</style><script>(function(){var MIN=.55,k0=1,raf=0;function fit(){raf=0;var b=document.body,d=document.documentElement;if(!b)return;var h=Math.max(b.scrollHeight,b.offsetHeight),w=Math.max(b.scrollWidth,b.offsetWidth),k=Math.min(1,innerHeight/h,innerWidth/w);if(k<MIN)k=MIN;k=Math.round(k*100)/100;d.style.overflowY=(k<=MIN&&h*k>innerHeight+2)?'auto':'hidden';if(k!==k0){k0=k;b.style.transform=k<1?'scale('+k+')':'none';setTimeout(function(){window.dispatchEvent(new Event('resize'))},0)}}function q(){if(!raf)raf=requestAnimationFrame(fit)}addEventListener('load',q);addEventListener('resize',q);addEventListener('orientationchange',q);document.addEventListener('DOMContentLoaded',function(){q();if(window.ResizeObserver)new ResizeObserver(q).observe(document.body)})})()<\/script>`;
 function botGame(id) {
   return a => {
     let vivo = true, f = null, on = null;
@@ -45,7 +47,7 @@ function botGame(id) {
       if (!vivo) return;
       f = document.createElement('iframe');
       f.className = 'gf'; f.title = JG[id].n; f.setAttribute('sandbox', 'allow-scripts allow-same-origin');
-      f.srcdoc = window.BOT[id].replace('<head>', `<head><script>window.__BEST=${miJuego(id).mejor || 0};<\/script>`);
+      f.srcdoc = window.BOT[id].replace('<head>', `<head><script>window.__BEST=${miJuego(id).mejor || 0};<\/script>${FIT}`);
       a.innerHTML = ''; a.appendChild(f); J.frame = f;
       on = e => { if (e.source === f.contentWindow && e.data && e.data.mp) guardar(id, +e.data.best || 0, false); };
       window.addEventListener('message', on);
