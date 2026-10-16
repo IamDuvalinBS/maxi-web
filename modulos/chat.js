@@ -1,6 +1,8 @@
 // Amigos y chats privados (solo los dos miembros pueden leerlos)
 let chats = [], unsub = null, msgs = [], curChat = null;
 const perfs = {}, bgImgs = {};
+perfs.bot = { nombre: 'Mambo Bot', avatar: 'img/logo.jpg' };   // chat con el bot (comandos)
+let botOk = false;
 let oc = { open: false, tab: null, who: 'me' };
 
 // [clave, nombre, color 1, color 2]  -> "Colores" del chat
@@ -51,7 +53,10 @@ const OPS = [
 const otro = () => location.hash.slice(6);
 const getCC = o => ({ col: 'rosa', bm: 'acento', bt: 'cristal', fp: 'defecto', fi: false, ...(((perfil && perfil.cc) || {})[o] || {}) });
 const bubOf = k => BUB.find(b => b[0] === k) || BUB[0];
-const cidOf = o => [user.uid, o].sort().join('_');
+const cidOf = o => o === 'bot' ? user.uid + '_bot' : [user.uid, o].sort().join('_');
+const perfHref = () => otro() === 'bot' ? '#chat/bot' : '#u/' + esc(otro());
+// formato de WhatsApp en las respuestas del bot: *negrita* y _cursiva_
+const fmtWA = t => esc(t).replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/(^|[\s(])_([^_\n]+)_(?=[\s).,!?]|$)/g, '$1<i>$2</i>');
 const avOf = (p, px, ring) => `<span class="av${ring ? ' ring' : ''}" style="width:${px}px;height:${px}px;font-size:${px / 2.5}px">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : inicial(p.nombre)}</span>`;
 const perfP = {};
 function perfOf(uid) {
@@ -72,21 +77,25 @@ function loadChats() {
   }, e => toast(errMsg(e)));
 }
 function chatsView() {
-  return `<div class="ti">${ic('chat', 24)}<span>Chats</span></div><section class="card"><p class="mu">Para agregar a alguien, pídele su ID (lo ve en su perfil).</p><div class="cmp" style="margin-top:12px"><input id="fid" inputmode="numeric" placeholder="ID de tu amigo" aria-label="ID de tu amigo"><button class="snd" data-a="addfriend" aria-label="Agregar amigo">${ic('userplus', 20)}</button></div></section>` +
-    (chats.length ? chats.map(c => {
-      const p = perfs[c.otro] || {}, u = c.ultimo || {}, vi = (c.vistos || {})[user.uid];
-      const nuevo = !!(u.de && u.de !== user.uid && u.t && u.t.seconds && (!vi || (vi.seconds || 0) < u.t.seconds));
-      return `<div class="card chr"><a class="avl" href="#u/${esc(c.otro)}" aria-label="Ver perfil de ${esc(p.nombre)}">${avOf(p, 52, 1)}</a><a class="chm" href="#chat/${esc(c.otro)}"><b>${esc(p.nombre)}</b>${esc_o(c.otro)}<small class="${nuevo ? 'new' : 'mu'}">${u.tp === 's' ? 'Sticker' : esc(u.tx || 'Sin mensajes todavía')}</small></a>${nuevo ? '<span class="dot" aria-label="Mensaje nuevo"></span>' : ''}</div>`;
-    }).join('')
-      : `<section class="card">${empty('chat', 'No tienes chats todavía. Agrega a un amigo con su ID.')}</section>`);
+  const fila = c => {
+    const esBot = c.otro === 'bot', p = perfs[c.otro] || {}, u = c.ultimo || {}, vi = (c.vistos || {})[user.uid];
+    const nuevo = !!(u.de && u.de !== user.uid && u.t && u.t.seconds && (!vi || (vi.seconds || 0) < u.t.seconds));
+    const hp = esBot ? '#chat/bot' : '#u/' + esc(c.otro);
+    return `<div class="card chr"><a class="avl" href="${hp}" aria-label="Ver perfil de ${esc(p.nombre)}">${avOf(p, 52, 1)}</a><a class="chm" href="#chat/${esc(c.otro)}"><b>${esc(p.nombre)}</b>${esc_o(c.otro)}<small class="${nuevo ? 'new' : 'mu'}">${u.tp === 's' ? 'Sticker' : esc(u.tx || (esBot ? 'Usa los comandos del bot aquí' : 'Sin mensajes todavía'))}</small></a>${nuevo ? '<span class="dot" aria-label="Mensaje nuevo"></span>' : ''}</div>`;
+  };
+  const botC = chats.find(c => c.otro === 'bot') || { otro: 'bot', miembros: [user.uid, 'bot'] };
+  const resto = chats.filter(c => c.otro !== 'bot');
+  return `<div class="ti">${ic('chat', 24)}<span>Chats</span></div>` + fila(botC) +
+    `<section class="card"><p class="mu">Para agregar a alguien, pídele su ID (lo ve en su perfil).</p><div class="cmp" style="margin-top:12px"><input id="fid" inputmode="numeric" placeholder="ID de tu amigo" aria-label="ID de tu amigo"><button class="snd" data-a="addfriend" aria-label="Agregar amigo">${ic('userplus', 20)}</button></div></section>` +
+    (resto.length ? resto.map(fila).join('') : `<section class="card">${empty('chat', 'No tienes chats con amigos todavía. Agrega a alguien con su ID.')}</section>`);
 }
 const esc_o = uid => (typeof esOwner === 'function' && esOwner(uid)) ? ' ' + vf() : '';
 function chatView() {
-  const p = perfs[otro()];
+  const p = perfs[otro()], esBot = otro() === 'bot';
   setTimeout(startChat, 0);
-  return `<section class="chatfull" id="cf"><div class="chh"><a href="#chats" class="ib" aria-label="Volver">${ic('back', 26)}</a><a class="avl" href="#u/${esc(otro())}" aria-label="Ver perfil">${avOf(p || {}, 44, 1)}</a><a class="chn" href="#u/${esc(otro())}"><b>${esc((p && p.nombre) || 'Chat')}${esc_o(otro())}</b></a><button class="ib pal" data-a="tema" aria-label="Personalizar chat" style="margin-left:auto">${ic('palette', 28)}</button></div>
+  return `<section class="chatfull" id="cf"><div class="chh"><a href="#chats" class="ib" aria-label="Volver">${ic('back', 26)}</a><a class="avl" href="${perfHref()}" aria-label="Ver perfil">${avOf(p || {}, 44, 1)}</a><a class="chn" href="${perfHref()}"><b>${esc((p && p.nombre) || 'Chat')}${esc_o(otro())}</b></a><button class="ib pal" data-a="tema" aria-label="Personalizar chat" style="margin-left:auto">${ic('palette', 28)}</button></div>
     <div id="tm" class="opts" hidden></div><div id="msgs" class="msgs"></div><div id="pan" class="pan" hidden></div>
-    <div class="cmp"><button class="ib stb" data-a="pan" aria-label="Stickers">${ic('sticker', 30)}</button><input id="cm" maxlength="500" placeholder="Escribe un mensaje" aria-label="Mensaje" autocomplete="off"><button class="snd" data-a="send" aria-label="Enviar">${ic('send', 22)}</button></div></section>`;
+    <div class="cmp">${esBot ? '' : `<button class="ib stb" data-a="pan" aria-label="Stickers">${ic('sticker', 30)}</button>`}<input id="cm" maxlength="500" placeholder="${esBot ? 'Escribe un comando, ej: .menu' : 'Escribe un mensaje'}" aria-label="Mensaje" autocomplete="off"><button class="snd" data-a="send" aria-label="Enviar">${ic('send', 22)}</button></div></section>`;
 }
 function optsHtml() {
   const c = getCC(otro());
@@ -121,9 +130,15 @@ let chatUn = null, vistoOtro = 0, miVisto = 0;
 async function startChat() {
   const o = otro(); if (!db || !user || !o) return;
   if (unsub && curChat === o) { pintaOpts(); aplicarChat(); draw(); return; }
+  if (o === 'bot' && curChat === o && !unsub) return;      // ya se está preparando
   if (unsub) unsub(); if (chatUn) chatUn();
   curChat = o; msgs = []; vistoOtro = 0; miVisto = 0; oc = { open: false, tab: null, who: 'me' };
   const cref = db.collection('chats').doc(cidOf(o));
+  if (o === 'bot' && !botOk) {
+    try { await cref.set({ miembros: [user.uid, 'bot'] }, { merge: true }); botOk = true; }
+    catch (e) { curChat = null; toast(errMsg(e)); return; }
+    if (curChat !== o) return;
+  }
   unsub = cref.collection('msgs').orderBy('t').limitToLast(100).onSnapshot(s => { msgs = s.docs.map(d => d.data()); draw(); marcaVisto(); }, e => toast(errMsg(e)));
   // cuándo vio el otro los mensajes (para las palomitas)
   chatUn = cref.onSnapshot(s => { const v = ((s.data() || {}).vistos || {})[o], n = v && v.seconds ? v.seconds * 1000 : 0; if (n !== vistoOtro) { vistoOtro = n; if (msgs.length) draw(); } }, () => {});
@@ -153,7 +168,10 @@ function draw() {
   el.innerHTML = msgs.length ? msgs.map(m => {
     const h = horaDe(m.t) + palomita(m), me = m.de === user.uid ? ' me' : '';
     if (m.tp === 's' && m.src) return stkOk(m.src) ? `<div class="stm${me}"><img src="${esc(m.src)}" alt="Sticker" width="128" height="128"><small>${h}</small></div>` : '';
-    return `<div class="bub${me}" style="${sty(me ? sm : st)}">${esc(m.tx)}<small>${h}</small></div>`;
+    const bot = m.de === 'bot', est = sty(me ? sm : st) + ';white-space:pre-wrap';
+    const img = m.tp === 'i' && typeof m.src === 'string' && m.src.startsWith('data:image/') ? `<img src="${esc(m.src)}" alt="" style="display:block;max-width:100%;border-radius:12px;margin-bottom:${m.tx ? 6 : 0}px">` : '';
+    const bts = bot && Array.isArray(m.bt) && m.bt.length ? `<span style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;white-space:normal">${m.bt.map(b => `<button class="btn sec sm" data-a="botbtn" data-id="${esc(b.id)}" data-l="${esc(b.l)}">${esc(b.l)}</button>`).join('')}</span>` : '';
+    return `<div class="bub${me}" style="${est}">${img}${bot ? fmtWA(m.tx || '') : esc(m.tx)}${bts}<small>${h}</small></div>`;
   }).join('') : `<p class="mu vacio">${ic('chat', 30)}<span>Escribe el primer mensaje</span></p>`;
   if (peg || !el._pos || (ult && ult.de === user.uid)) { el._pos = 1; el._peg = true; pega(el); }
 }
@@ -161,7 +179,7 @@ function draw() {
 async function enviar(m) {
   const o = otro(); if (!m || (!m.tx && !m.src)) return;
   const ref = db.collection('chats').doc(cidOf(o)), ts = firebase.firestore.FieldValue.serverTimestamp();
-  const doc = { de: user.uid, tp: m.tp, t: ts }; if (m.tx) doc.tx = m.tx; if (m.src) doc.src = m.src;
+  const doc = { de: user.uid, tp: m.tp, t: ts }; if (m.tx) doc.tx = m.tx; if (m.src) doc.src = m.src; if (m.bid) doc.bid = m.bid;
   try {
     await ref.collection('msgs').add(doc);
     await ref.set({ ultimo: { tx: m.tp === 's' ? 'Sticker' : m.tx, tp: m.tp, t: ts, de: user.uid } }, { merge: true });
@@ -190,6 +208,7 @@ MODS.push(async (a, t) => {
     if (!p.hidden) { oc.open = false; pintaOpts(); p.innerHTML = panHtml(); cargarStickers(); }
     return true;
   }
+  if (a === 'botbtn') { await enviar({ tx: t.dataset.l, tp: 't', bid: t.dataset.id }); return true; }
   if (a === 'send') { const i = $('#cm'), v = i.value.trim(); i.value = ''; await enviar({ tx: v, tp: 't' }); return true; }
   if (a === 'addfriend') {
     const id = ($('#fid').value || '').trim();
