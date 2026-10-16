@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const NAV = [['inicio','home','Inicio','Menú'],['juegos','game','Juegos','Menú'],['misiones','target','Misiones','Menú'],['pases','trophy','Pases','Menú'],['canjear','ticket','Canjear','Menú'],['chats','chat','Chats','Social'],['noticias','news','Noticias','Social'],['perfil','user','Mi perfil','Social']];
+const NAV = [['inicio','home','Inicio','Menú'],['juegos','game','Juegos','Menú'],['misiones','target','Misiones','Menú'],['pases','trophy','Pases','Menú'],['canjear','ticket','Canjear','Menú'],['chats','chat','Chats','Social'],['noticias','news','Noticias','Social'],['bot','bot','Comandos','Social'],['perfil','user','Mi perfil','Social']];
 let fb = null, db = null, user = null, perfil = null, ready = false, pendingName = '', authMode = 'in';
 try { if (window.firebase && C.firebase && C.firebase.apiKey) { firebase.initializeApp(C.firebase); fb = firebase.auth(); db = firebase.firestore(); try { db.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch (_) {} } } catch (e) { fb = null; db = null; }
 
@@ -74,7 +74,7 @@ const PAGES = {
     let h = '';
     if (!fb) h += `<section class="card note"><h2>Modo demo</h2><p class="mu">Falta conectar Firebase para que funcione el login con Google. Pega tus claves en config.js.</p></section>`;
     h += user ? `<section class="hero"><span class="hi">Hola,</span><h1>${esc(nombre())}</h1><p>Qué bueno verte de nuevo.</p><i class="sh1"></i><i class="sh2"></i><i class="sh3"></i></section>` : gate('Entra con Google para guardar tu perfil.');
-    h += ownersView() + postsView();
+    h += (typeof botCard === 'function' ? botCard() : '') + ownersView() + postsView();
     return h;
   },
   misiones: () => misionesView(),
@@ -85,9 +85,10 @@ const PAGES = {
   noticias: () => noticiasView(),
   noticia: () => noticiaView(),
   u: () => publicoView(),
+  bot: () => botView(),
   pases: () => `<section class="card"><div class="ti">${ic('trophy', 24)}<span>Pases</span></div>${empty('trophy', 'No hay pases disponibles todavía. Espera a las próximas actualizaciones.')}</section>`,
   canjear: () => user ? `<section class="card"><div class="ti">${ic('ticket', 24)}<span>Canjear</span></div>${empty('ticket', 'No tienes recompensas por canjear todavía.')}</section>` : gate('Entra con Google para ver tus códigos de canje.'),
-  perfil: () => perfilView() + `<section class="card"><div class="ti">${ic('lock', 22)}<span>Cuenta privada</span></div><p class="mu">Tu correo solo lo ves tú.</p><p>${esc(user.email || '')}</p></section><section class="card pf"><div class="ti">${ic('gear', 22)}<span>Ajustes</span></div><label for="nom">Nombre de usuario</label><input id="nom" maxlength="20" value="${esc(nombre())}"><button class="btn" data-a="save">Guardar cambios</button>${owner ? `<label for="oid">Agregar owner por ID</label><input id="oid" inputmode="numeric" placeholder="ID del usuario"><button class="btn sec" data-a="addowner">Agregar owner</button>` : ''}</section>`
+  perfil: () => perfilView() + (typeof waCard === 'function' ? waCard() : '') + `<section class="card"><div class="ti">${ic('lock', 22)}<span>Cuenta privada</span></div><p class="mu">Tu correo solo lo ves tú.</p><p>${esc(user.email || '')}</p></section><section class="card pf"><div class="ti">${ic('gear', 22)}<span>Ajustes</span></div><label for="nom">Nombre de usuario</label><input id="nom" maxlength="20" value="${esc(nombre())}"><button class="btn" data-a="save">Guardar cambios</button>${owner ? `<label for="oid">Agregar owner por ID</label><input id="oid" inputmode="numeric" placeholder="ID del usuario"><button class="btn sec" data-a="addowner">Agregar owner</button>` : ''}</section>`
 };
 function renderFoot() {
   const f = $('#foot'); if (!f) return;
@@ -122,14 +123,14 @@ async function loadPerfil() {
   const ref = db.collection('perfiles').doc(user.uid);
   try {
     try { const c = await ref.get({ source: 'cache' }); if (c.exists) { perfil = c.data(); render(); } } catch (_) {}
-    loadPosts(); loadChats(); loadNews(); loadOwners();           // todo en paralelo
+    loadPosts(); loadChats(); loadNews(); loadOwners(); if (typeof escuchaBot === 'function') { escuchaBot(); escuchaWA(); }           // todo en paralelo
     const [d] = await Promise.all([ref.get(), checkOwner()]);
     if (d.exists) { perfil = d.data(); if (!perfil.idn) { perfil.idn = newId(); await ref.set({ idn: perfil.idn }, { merge: true }); } }
     else { perfil = { nombre: (pendingName || nombre()).slice(0, 20), idn: newId() }; await ref.set({ ...perfil, creado: firebase.firestore.FieldValue.serverTimestamp() }); }
     render();
   } catch (e) { toast(errMsg(e)); }
 }
-function setUser(u) { user = u || null; perfil = null; if (chatsUnsub) { chatsUnsub(); chatsUnsub = null; } chats = []; render(); if (user) setTimeout(loadPerfil, 0); }
+function setUser(u) { user = u || null; perfil = null; if (chatsUnsub) { chatsUnsub(); chatsUnsub = null; } chats = []; if (typeof botUn !== 'undefined' && botUn) { botUn(); botUn = null; botEst = null; } if (typeof soltarWA === 'function') soltarWA(); render(); if (user) setTimeout(loadPerfil, 0); }
 
 const setMenu = on => document.body.classList.toggle('menu', on);
 document.addEventListener('click', async e => {
