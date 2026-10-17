@@ -56,8 +56,8 @@ const bubOf = k => BUB.find(b => b[0] === k) || BUB[0];
 const cidOf = o => o === 'bot' ? user.uid + '_bot' : [user.uid, o].sort().join('_');
 const perfHref = () => otro() === 'bot' ? '#chat/bot' : '#u/' + esc(otro());
 // ── formato de WhatsApp: *negrita* _cursiva_ ~tachado~ `código` ```bloque``` > cita, listas, enlaces y etiquetas ──
-const urlOk = u => typeof u === 'string' && /^https?:\/\//i.test(u);
-const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// urlOk ya existe en iconos.js
+const waReEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 function fmtWA(t, mapa, nombres) {
   const hold = [], put = h => { hold.push(h); return '\u0000' + (hold.length - 1) + '\u0000'; };
   const chip = x => put('<span style="color:#8fdcff;font-weight:600;background:#00000026;border-radius:6px;padding:0 4px">@' + esc(x) + '</span>');
@@ -74,7 +74,7 @@ function fmtWA(t, mapa, nombres) {
   s = esc(s);
   s = s.replace(/@(\d{6,20})/g, (_, n) => chip(mapa && mapa[n] ? mapa[n] : n));
   for (const n of (nombres || []).slice().sort((a, b) => b.length - a.length)) {
-    if (n) s = s.replace(new RegExp('@' + reEsc(esc(n)), 'g'), () => chip(n));
+    if (n) s = s.replace(new RegExp('@' + waReEsc(esc(n)), 'g'), () => chip(n));
   }
   s = s.replace(/\*\*([^*\n]+)\*\*/g, '*$1*');
   const L = '(^|[\\s(>;\\u0000])', R = '(?=$|[\\s).,:;!?<&\\u0000])';
@@ -99,10 +99,10 @@ function fmtWA(t, mapa, nombres) {
   return out;
 }
 // "Ver más" en textos largos (el estado abierto se conserva al refrescar el chat)
-const vmAbiertos = new Set();
-const vmEstilo = ab => ab ? 'max-height:none' : 'max-height:15em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 72%,transparent);mask-image:linear-gradient(#000 72%,transparent)';
+const waVmAbiertos = new Set();
+const waVmEstilo = ab => ab ? 'max-height:none' : 'max-height:15em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 72%,transparent);mask-image:linear-gradient(#000 72%,transparent)';
 // tarjeta de previa (enlace o "previa" que manda el bot)
-function tarjetaPrev(p) {
+function waTarjeta(p) {
   if (!p || !(p.t || p.b || p.img)) return '';
   const img = typeof p.img === 'string' && p.img.startsWith('data:image/') ? `<img src="${esc(p.img)}" alt="" style="display:block;width:100%;max-height:190px;object-fit:cover">` : '';
   const cuerpo = `${img}<span style="display:block;padding:8px 10px">${p.t ? `<b style="display:block">${esc(p.t)}</b>` : ''}${p.b ? `<span style="display:block;font-size:.85em;opacity:.8">${esc(p.b)}</span>` : ''}</span>`;
@@ -110,9 +110,9 @@ function tarjetaPrev(p) {
   return urlOk(p.u) ? `<a href="${esc(p.u)}" target="_blank" rel="noopener noreferrer" style="${est}">${cuerpo}</a>` : `<span style="${est}">${cuerpo}</span>`;
 }
 // todo lo que puede traer un mensaje del bot
-function cuerpoBot(m) {
+function waCuerpo(m) {
   let h = '';
-  if (m.ar) h += tarjetaPrev(m.ar);
+  if (m.ar) h += waTarjeta(m.ar);
   if (m.tp === 'i' && typeof m.src === 'string' && m.src.startsWith('data:image/')) h += `<img src="${esc(m.src)}" alt="" style="display:block;max-width:100%;border-radius:12px;margin-bottom:${m.tx ? 6 : 0}px">`;
   if (m.tp === 'v' && urlOk(m.u)) h += m.gif
     ? `<video src="${esc(m.u)}" autoplay loop muted playsinline style="display:block;max-width:100%;border-radius:12px;margin-bottom:6px"></video>`
@@ -122,11 +122,11 @@ function cuerpoBot(m) {
   if (m.tx) {
     const cuerpo = fmtWA(m.tx, m.mn);
     if (m.tx.length > 900 || (m.tx.match(/\n/g) || []).length > 16) {      // texto largo: "Ver más"
-      const k = (m.t && m.t.seconds != null ? m.t.seconds + '.' + m.t.nanoseconds : 'x') + '|' + m.tx.length, ab = vmAbiertos.has(k);
-      h += `<div data-k="${esc(k)}" style="${vmEstilo(ab)}">${cuerpo}</div><button class="btn sec sm" data-a="vermas" style="margin-top:6px">${ab ? 'Ver menos' : 'Ver más'}</button>`;
+      const k = (m.t && m.t.seconds != null ? m.t.seconds + '.' + m.t.nanoseconds : 'x') + '|' + m.tx.length, ab = waVmAbiertos.has(k);
+      h += `<div data-k="${esc(k)}" style="${waVmEstilo(ab)}">${cuerpo}</div><button class="btn sec sm" data-a="vermas" style="margin-top:6px">${ab ? 'Ver menos' : 'Ver más'}</button>`;
     } else h += cuerpo;
   }
-  if (m.lp) h += tarjetaPrev(m.lp);
+  if (m.lp) h += waTarjeta(m.lp);
   if (m.ft) h += `<span style="display:block;font-size:.78em;opacity:.7;margin-top:6px;white-space:normal">${esc(m.ft)}</span>`;
   const bt = (Array.isArray(m.bt) ? m.bt : []).map(b => `<button class="btn sec sm" data-a="botbtn" data-id="${esc(b.id)}" data-l="${esc(b.l)}">${esc(b.l)}</button>`);
   const bu = (Array.isArray(m.bu) ? m.bu : []).filter(b => urlOk(b.u)).map(b => `<a class="btn sec sm" href="${esc(b.u)}" target="_blank" rel="noopener noreferrer">${esc(b.l)}</a>`);
@@ -134,35 +134,35 @@ function cuerpoBot(m) {
   return h;
 }
 // etiquetar con @ (solo en el chat del bot)
-let dirU = null, dirCarga = false, menc = [];
-async function cargaDirU() {
-  if (dirU || dirCarga || !db) return;
-  dirCarga = true;
-  try { const d = await db.collection('bot').doc('usuarios').get(); dirU = d.exists ? (d.data().lista || []) : []; } catch (e) { dirU = []; }
-  dirCarga = false;
+let waDirU = null, waDirCarga = false, waMenc = [];
+async function waCargaDir() {
+  if (waDirU || waDirCarga || !db) return;
+  waDirCarga = true;
+  try { const d = await db.collection('bot').doc('usuarios').get(); waDirU = d.exists ? (d.data().lista || []) : []; } catch (e) { waDirU = []; }
+  waDirCarga = false;
 }
-function mpHide() { const b = document.getElementById('mnp'); if (b) { b.style.display = 'none'; b.innerHTML = ''; } }
+function waMpHide() { const b = document.getElementById('mnp'); if (b) { b.style.display = 'none'; b.innerHTML = ''; } }
 document.addEventListener('input', async e => {
   if (!e.target || e.target.id !== 'cm' || typeof otro !== 'function' || otro() !== 'bot') return;
   const v = e.target.value, pos = e.target.selectionStart == null ? v.length : e.target.selectionStart;
   const m = v.slice(0, pos).match(/(^|\s)@([^\s@]{0,20})$/);
-  if (!m) { mpHide(); return; }
-  await cargaDirU();
+  if (!m) { waMpHide(); return; }
+  await waCargaDir();
   const q = m[2].toLowerCase(), box = document.getElementById('mnp');
   if (!box) return;
-  const r = (dirU || []).filter(x => x.n.toLowerCase().includes(q)).sort((a, b) => (a.n.toLowerCase().startsWith(q) ? 0 : 1) - (b.n.toLowerCase().startsWith(q) ? 0 : 1)).slice(0, 8);
-  if (!r.length) { mpHide(); return; }
+  const r = (waDirU || []).filter(x => x.n.toLowerCase().includes(q)).sort((a, b) => (a.n.toLowerCase().startsWith(q) ? 0 : 1) - (b.n.toLowerCase().startsWith(q) ? 0 : 1)).slice(0, 8);
+  if (!r.length) { waMpHide(); return; }
   box.innerHTML = r.map(x => `<button class="btn sec sm" data-a="mnpick" data-k="${esc(x.k)}" data-n="${esc(x.n)}">@${esc(x.n)}</button>`).join('');
   box.style.display = 'flex';
 });
-function mpElige(k, n) {
+function waMpElige(k, n) {
   const i = document.getElementById('cm'); if (!i) return;
   const pos = i.selectionStart == null ? i.value.length : i.selectionStart;
   const antes = i.value.slice(0, pos).replace(/@([^\s@]{0,20})$/, '@' + n + ' ');
   i.value = antes + i.value.slice(pos);
   i.focus(); i.setSelectionRange(antes.length, antes.length);
-  if (!menc.some(x => x.k === k)) menc.push({ k, n });
-  mpHide();
+  if (!waMenc.some(x => x.k === k)) waMenc.push({ k, n });
+  waMpHide();
 }
 const avOf = (p, px, ring) => `<span class="av${ring ? ' ring' : ''}" style="width:${px}px;height:${px}px;font-size:${px / 2.5}px">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : inicial(p.nombre)}</span>`;
 const perfP = {};
@@ -277,7 +277,7 @@ function draw() {
     const h = horaDe(m.t) + palomita(m), me = m.de === user.uid ? ' me' : '';
     if (m.tp === 's' && m.src) return stkOk(m.src) ? `<div class="stm${me}"><img src="${esc(m.src)}" alt="Sticker" width="128" height="128"><small>${h}</small></div>` : '';
     const bot = m.de === 'bot', est = sty(me ? sm : st) + ';white-space:pre-wrap';
-    return `<div class="bub${me}" style="${est}">${bot ? cuerpoBot(m) : fmtWA(m.tx || '', null, (Array.isArray(m.mn) ? m.mn : []).map(x => x.n))}<small>${h}</small></div>`;
+    return `<div class="bub${me}" style="${est}">${bot ? waCuerpo(m) : fmtWA(m.tx || '', null, (Array.isArray(m.mn) ? m.mn : []).map(x => x.n))}<small>${h}</small></div>`;
   }).join('') : `<p class="mu vacio">${ic('chat', 30)}<span>Escribe el primer mensaje</span></p>`;
   if (peg || !el._pos || (ult && ult.de === user.uid)) { el._pos = 1; el._peg = true; pega(el); }
 }
@@ -317,13 +317,13 @@ MODS.push(async (a, t) => {
   if (a === 'botbtn') { await enviar({ tx: t.dataset.l, tp: 't', bid: t.dataset.id }); return true; }
   if (a === 'vermas') {
     const box = t.previousElementSibling; if (!box) return true;
-    const k = box.dataset.k, ab = !vmAbiertos.has(k);
-    if (ab) vmAbiertos.add(k); else vmAbiertos.delete(k);
-    box.setAttribute('style', vmEstilo(ab)); t.textContent = ab ? 'Ver menos' : 'Ver más';
+    const k = box.dataset.k, ab = !waVmAbiertos.has(k);
+    if (ab) waVmAbiertos.add(k); else waVmAbiertos.delete(k);
+    box.setAttribute('style', waVmEstilo(ab)); t.textContent = ab ? 'Ver menos' : 'Ver más';
     return true;
   }
-  if (a === 'mnpick') { mpElige(t.dataset.k, t.dataset.n); return true; }
-  if (a === 'send') { const i = $('#cm'), v = i.value.trim(); i.value = ''; const mn = otro() === 'bot' ? menc.filter(x => v.includes('@' + x.n)).map(x => ({ k: x.k, n: x.n })) : []; menc = []; mpHide(); await enviar({ tx: v, tp: 't', mn }); return true; }
+  if (a === 'mnpick') { waMpElige(t.dataset.k, t.dataset.n); return true; }
+  if (a === 'send') { const i = $('#cm'), v = i.value.trim(); i.value = ''; const mn = otro() === 'bot' ? waMenc.filter(x => v.includes('@' + x.n)).map(x => ({ k: x.k, n: x.n })) : []; waMenc = []; waMpHide(); await enviar({ tx: v, tp: 't', mn }); return true; }
   if (a === 'addfriend') {
     const id = ($('#fid').value || '').trim();
     if (!id) { toast('Escribe el ID de tu amigo.'); return true; }
