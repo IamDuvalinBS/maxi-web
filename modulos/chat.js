@@ -1,5 +1,8 @@
 // Amigos y chats privados (solo los dos miembros pueden leerlos)
 let chats = [], unsub = null, msgs = [], curChat = null;
+const waBotMsgs = [];                     // mensajes del chat con el bot: solo en memoria, hasta recargar la página
+let waBotUn = null, waBotUid = null, waBotNuevos = 0;
+const waLista = () => otro() === 'bot' ? waBotMsgs : msgs;
 const perfs = {}, bgImgs = {};
 perfs.bot = { nombre: 'Mambo Bot', avatar: 'img/logo.jpg' };   // chat con el bot (comandos)
 let botOk = false;
@@ -102,7 +105,7 @@ function fmtWA(t, mapa, nombres) {
 const waVmAbiertos = new Set();
 const waVmEstilo = ab => ab ? 'max-height:none' : 'max-height:15em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 72%,transparent);mask-image:linear-gradient(#000 72%,transparent)';
 // imagen de una tarjeta o mensaje: enlace directo (https) o miniatura incrustada
-const waImgSrc = (iu, img) => (typeof iu === 'string' && /^https:\/\//i.test(iu)) ? iu : (typeof img === 'string' && img.startsWith('data:image/')) ? img : '';
+const waImgSrc = (iu, img) => (typeof img === 'string' && img.startsWith('data:image/')) ? img : (typeof iu === 'string' && /^https:\/\//i.test(iu)) ? iu : '';
 const waImg = (src, est) => `<img src="${esc(src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="${est}">`;
 // tarjeta de previa (enlace o "previa" que manda el bot)
 function waTarjeta(p) {
@@ -115,9 +118,11 @@ function waTarjeta(p) {
 }
 // botones: al ancho del mensaje, debajo de él y pegados entre sí
 const waBtnEst = 'display:block;box-sizing:border-box;width:100%;margin:6px 0 0;text-align:center;white-space:normal;touch-action:manipulation;-webkit-tap-highlight-color:transparent';
+// mensaje al que responde (cita), como en WhatsApp
+const waCita = m => m.qr ? `<span style="display:block;border-left:3px solid #8fdcff;background:#00000030;border-radius:8px;padding:4px 8px;margin-bottom:6px;font-size:.85em;white-space:normal;overflow:hidden"><b style="display:block;opacity:.9">${m.qd === 'b' ? 'Mambo Bot' : 'Tú'}</b>${esc((m.qt || (waBusca(m.qr) || {}).tx || '').slice(0, 140))}</span>` : '';
 // todo lo que puede traer un mensaje del bot
 function waCuerpo(m) {
-  let h = '';
+  let h = waCita(m);
   if (m.ar) h += waTarjeta(m.ar);
   const im = m.tp === 'i' ? waImgSrc(m.iu, m.src) : '';
   if (im) h += waImg(im, `display:block;max-width:100%;border-radius:12px;margin-bottom:${m.tx ? 6 : 0}px`);
@@ -145,7 +150,7 @@ const waCache = new WeakMap(); let waSeq = 0;
 const waSty = b => `background:${b[2]};color:${b[3]};${b[4] || ''}`;
 function waHtmlMsg(m) {
   if (!m._id) m._id = ++waSeq;
-  const h = horaDe(m.t) + palomita(m), me = m.de === user.uid ? ' me' : '';
+  const h = (m.edit ? 'editado · ' : '') + horaDe(m.t) + palomita(m), me = m.de === user.uid ? ' me' : '';
   if (m.tp === 's' && m.src) return stkOk(m.src) ? `<div class="stm${me}" id="mb${m._id}"><img src="${esc(m.src)}" alt="Sticker" width="128" height="128"><small>${h}</small></div>` : '';
   let cuerpo = waCache.get(m);
   if (cuerpo === undefined) { cuerpo = m.de === 'bot' ? waCuerpo(m) : fmtWA(m.tx || '', null, (Array.isArray(m.mn) ? m.mn : []).map(x => x.n)); waCache.set(m, cuerpo); }
@@ -206,7 +211,7 @@ function loadChats() {
 function chatsView() {
   const fila = c => {
     const esBot = c.otro === 'bot', p = perfs[c.otro] || {}, u = c.ultimo || {}, vi = (c.vistos || {})[user.uid];
-    const nuevo = !esBot && !!(u.de && u.de !== user.uid && u.t && u.t.seconds && (!vi || (vi.seconds || 0) < u.t.seconds));
+    const nuevo = esBot ? waBotNuevos > 0 : !!(u.de && u.de !== user.uid && u.t && u.t.seconds && (!vi || (vi.seconds || 0) < u.t.seconds));
     const hp = esBot ? '#chat/bot' : '#u/' + esc(c.otro);
     return `<div class="card chr"><a class="avl" href="${hp}" aria-label="Ver perfil de ${esc(p.nombre)}">${avOf(p, 52, 1)}</a><a class="chm" href="#chat/${esc(c.otro)}"><b>${esc(p.nombre)}</b>${esc_o(c.otro)}<small class="${nuevo ? 'new' : 'mu'}">${esBot ? 'Usa los comandos del bot aquí' : u.tp === 's' ? 'Sticker' : esc(u.tx || 'Sin mensajes todavía')}</small></a>${nuevo ? '<span class="dot" aria-label="Mensaje nuevo"></span>' : ''}</div>`;
   };
@@ -257,7 +262,7 @@ async function setCC(patch) {
 let chatUn = null, vistoOtro = 0, miVisto = 0;
 async function startChat() {
   const o = otro(); if (!db || !user || !o) return;
-  if (unsub && curChat === o) { pintaOpts(); aplicarChat(); const e = $('#msgs'); if (!e || e._n !== msgs.length) draw(); return; }
+  if (unsub && curChat === o) { pintaOpts(); aplicarChat(); const e = $('#msgs'); if (!e || e._n !== waLista().length) draw(); return; }
   if (o === 'bot' && curChat === o && !unsub) return;      // ya se está preparando
   if (unsub) unsub(); if (chatUn) chatUn();
   curChat = o; msgs = []; vistoOtro = 0; miVisto = 0; oc = { open: false, tab: null, who: 'me' };
@@ -268,9 +273,9 @@ async function startChat() {
   chatUn = cref.onSnapshot(s => { const v = ((s.data() || {}).vistos || {})[o], n = v && v.seconds ? v.seconds * 1000 : 0; if (n !== vistoOtro) { vistoOtro = n; if (msgs.length) draw(); } }, () => {});
   draw(); loadBg(o);
 }
-// ───────── chat con el bot: efímero ─────────
-// Firebase solo hace de "tubería": tu mensaje y la respuesta pasan por ahí unos segundos y el bot los borra.
-// Lo que ves vive solo en esta pantalla: al salir del chat desaparece.
+// ───────── chat con el bot ─────────
+// Los mensajes viven solo en esta pantalla (memoria de la página): se borran al recargar la página, no al salir del chat.
+// Firebase es solo la tubería: el bot borra tu mensaje al recibirlo y esta página borra cada respuesta en cuanto la recibe.
 let waBotP = null;
 function waBotChat() {
   if (!waBotP) {
@@ -279,48 +284,74 @@ function waBotChat() {
   }
   return waBotP;
 }
+const waEnChat = () => curChat === 'bot' && !!$('#msgs');
+const waBusca = id => waBotMsgs.find(x => x.cl === id || x.ci === id);
 function waPinta(m) {
-  const el = $('#msgs'); if (!el) return;
+  if (!waEnChat()) return;
+  const el = $('#msgs');
   if (!el._n) el.innerHTML = '';                          // quita el aviso de "vacío"
-  el.insertAdjacentHTML('beforeend', waHtmlMsg(m)); el._n = msgs.length;
+  el.insertAdjacentHTML('beforeend', waHtmlMsg(m)); el._n = waBotMsgs.length;
   if (el._peg !== false || m.de === user.uid) { el._peg = true; pega(el); }
 }
-function waReacciona(id, em) {
-  const m = msgs.find(x => x.cl === id || x.ci === id); if (!m) return;
-  m.rx = em || '';
-  const n = document.getElementById('mb' + m._id); if (n) n.outerHTML = waHtmlMsg(m);
+function waRepinta(m) { const n = document.getElementById('mb' + m._id); if (n) n.outerHTML = waHtmlMsg(m); }
+function waReacciona(id, em) { const m = waBusca(id); if (!m) return; m.rx = em || ''; waRepinta(m); }
+const WA_CAMPOS = ['tx', 'tp', 'src', 'iu', 'u', 'nm', 'gif', 'ft', 'bt', 'bu', 'lp', 'ar', 'mn', 'qr', 'qt', 'qd'];
+function waEdita(d) {                                     // el bot editó un mensaje suyo (como el .ping)
+  const m = waBusca(d.ed); if (!m) return;
+  for (const k of WA_CAMPOS) { if (k in d) m[k] = d[k]; else if (!['qr', 'qt', 'qd'].includes(k)) delete m[k]; }   // la cita original se conserva
+  m.edit = true; waCache.delete(m); waRepinta(m);
+}
+function waBorra(id) {                                    // el bot borró un mensaje
+  const i = waBotMsgs.findIndex(x => x.cl === id || x.ci === id); if (i < 0) return;
+  const [m] = waBotMsgs.splice(i, 1);
+  const n = document.getElementById('mb' + m._id); if (n) n.remove();
+  const el = waEnChat() ? $('#msgs') : null; if (el) el._n = waBotMsgs.length;
 }
 function waVisto() {                                      // el bot ya respondió: palomitas de "visto"
   vistoOtro = Date.now();
+  if (!waEnChat()) return;
   document.querySelectorAll('#msgs .bub.me .tk:not(.v)').forEach(t => { t.classList.add('v'); t.innerHTML = ic('check2', 15); t.setAttribute('aria-label', 'Visto'); });
 }
-async function waStartBot() {
-  draw();                                                 // la pantalla queda lista al instante
-  try { await waBotChat(); } catch (e) { curChat = null; toast(errMsg(e)); return; }
-  if (curChat !== 'bot') return;
+// Escucha las respuestas del bot mientras la página esté abierta (aunque salgas del chat, no se pierden)
+function waEscuchaBot() {
+  if (waBotUn && waBotUid === user.uid) return;
+  if (waBotUn) { waBotUn(); waBotUn = null; }
+  if (waBotUid && waBotUid !== user.uid) waBotMsgs.length = 0;
+  waBotUid = user.uid;
   let primera = true;
-  unsub = db.collection('chats').doc(cidOf('bot')).collection('msgs').orderBy('t').limitToLast(30).onSnapshot(s => {
+  waBotUn = db.collection('chats').doc(cidOf('bot')).collection('msgs').orderBy('t').limitToLast(30).onSnapshot(s => {
     if (primera) { if (!s.metadata.fromCache) primera = false; return; }   // lo que hubiera de antes se ignora
+    if (!user || user.uid !== waBotUid) return;
     let nuevo = false;
     for (const ch of s.docChanges()) {
       if (ch.type !== 'added') continue;
       const d = ch.doc.data();
       if (d.de !== 'bot') continue;
-      if (d.tp === 'r') { waReacciona(d.re, d.em); continue; }
-      msgs.push(d); waPinta(d); nuevo = true;
+      ch.doc.ref.delete().catch(() => {});                // ya está en tu pantalla: no se guarda nada en Firebase
+      if (d.tp === 'r') waReacciona(d.re, d.em);
+      else if (d.tp === 'x') waBorra(d.re);
+      else if (d.ed) waEdita(d);
+      else { waBotMsgs.push(d); waPinta(d); nuevo = true; if (!waEnChat()) waBotNuevos++; }
     }
-    if (nuevo) waVisto();
-  }, e => toast(errMsg(e)));
+    if (nuevo) { waVisto(); if (!waEnChat() && !location.hash.startsWith('#chat/')) renderSoon(); }
+  }, e => { waBotUn = null; waBotUid = null; toast(errMsg(e)); });
+}
+async function waStartBot() {
+  msgs = waBotMsgs; waBotNuevos = 0;
+  draw();                                                 // la pantalla queda lista al instante, con lo que ya había
+  unsub = () => {};                                       // la escucha del bot sigue activa mientras la página esté abierta
+  try { await waBotChat(); } catch (e) { unsub = null; curChat = null; toast(errMsg(e)); return; }
+  waEscuchaBot();
 }
 async function waEnviarBot(m) {
   const cl = Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-4);
   const loc = { de: user.uid, tp: 't', tx: m.tx || '', cl, t: firebase.firestore.Timestamp.now() };
   if (Array.isArray(m.mn) && m.mn.length) loc.mn = m.mn;
-  msgs.push(loc); waPinta(loc);                           // aparece al instante, sin esperar a la red
+  waBotMsgs.push(loc); waPinta(loc);                      // aparece al instante y se queda en pantalla
   const ref = db.collection('chats').doc(cidOf('bot')), ts = firebase.firestore.FieldValue.serverTimestamp();
   const doc = { de: user.uid, tp: 't', t: ts, tx: loc.tx, cl };
   if (m.bid) doc.bid = m.bid; if (loc.mn) doc.mn = loc.mn;
-  try { await waBotChat(); await ref.collection('msgs').add(doc); ref.set({ ping: ts }, { merge: true }).catch(() => {}); }
+  try { await waBotChat(); waEscuchaBot(); await ref.collection('msgs').add(doc); ref.set({ ping: ts }, { merge: true }).catch(() => {}); }
   catch (e) { toast(errMsg(e)); }
 }
 // Avisa que ya viste los mensajes del otro
@@ -341,11 +372,11 @@ function draw() {
     el.addEventListener('load', () => { if (el._peg !== false) el.scrollTop = el.scrollHeight; }, true);
     if (window.ResizeObserver) new ResizeObserver(() => { if (el._peg !== false) el.scrollTop = el.scrollHeight; }).observe(el);
   }
-  const peg = el._peg !== false, ult = msgs[msgs.length - 1];
+  const L = waLista(), peg = el._peg !== false, ult = L[L.length - 1];
   const c = getCC(otro()), sm = bubOf(c.bm), st = bubOf(c.bt);
   const sty = b => `background:${b[2]};color:${b[3]};${b[4] || ''}`;
-  el.innerHTML = msgs.length ? msgs.map(waHtmlMsg).join('') : `<p class="mu vacio">${ic('chat', 30)}<span>${otro() === 'bot' ? 'Escribe un comando, ej: .menu' : 'Escribe el primer mensaje'}</span></p>`;
-  el._n = msgs.length;
+  el.innerHTML = L.length ? L.map(waHtmlMsg).join('') : `<p class="mu vacio">${ic('chat', 30)}<span>${otro() === 'bot' ? 'Escribe un comando, ej: .menu' : 'Escribe el primer mensaje'}</span></p>`;
+  el._n = L.length;
   if (peg || !el._pos || (ult && ult.de === user.uid)) { el._pos = 1; el._peg = true; pega(el); }
 }
 // m = { tx, tp:'t' } o { src, tp:'s' }
@@ -390,7 +421,7 @@ MODS.push(async (a, t) => {
   }
   if (a === 'vermas') {
     const box = t.previousElementSibling; if (!box) return true;
-    const bub = t.closest('.bub'), mm = bub && msgs.find(x => 'mb' + x._id === bub.id); if (mm) waCache.delete(mm);
+    const bub = t.closest('.bub'), mm = bub && waLista().find(x => 'mb' + x._id === bub.id); if (mm) waCache.delete(mm);
     const k = box.dataset.k, ab = !waVmAbiertos.has(k);
     if (ab) waVmAbiertos.add(k); else waVmAbiertos.delete(k);
     box.setAttribute('style', waVmEstilo(ab)); t.textContent = ab ? 'Ver menos' : 'Ver más';
