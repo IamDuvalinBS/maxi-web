@@ -86,7 +86,7 @@ const PAGES = {
   noticia: () => noticiaView(),
   u: () => publicoView(),
   bot: () => botView(),
-  pases: () => `<section class="card"><div class="ti">${ic('trophy', 24)}<span>Pases</span></div>${empty('trophy', 'No hay pases disponibles todavía. Espera a las próximas actualizaciones.')}</section>`,
+  pases: () => pasesView(),
   canjear: () => user ? `<section class="card"><div class="ti">${ic('ticket', 24)}<span>Canjear</span></div>${empty('ticket', 'No tienes recompensas por canjear todavía.')}</section>` : gate('Entra con Google para ver tus códigos de canje.'),
   perfil: () => perfilView() + (typeof waCard === 'function' ? waCard() : '') + `<section class="card"><div class="ti">${ic('lock', 22)}<span>Cuenta privada</span></div><p class="mu">Tu correo solo lo ves tú.</p><p>${esc(user.email || '')}</p></section><section class="card pf"><div class="ti">${ic('gear', 22)}<span>Ajustes</span></div><label for="nom">Nombre de usuario</label><input id="nom" maxlength="20" value="${esc(nombre())}"><button class="btn" data-a="save">Guardar cambios</button>${owner ? `<label for="oid">Agregar owner por ID</label><input id="oid" inputmode="numeric" placeholder="ID del usuario"><button class="btn sec" data-a="addowner">Agregar owner</button>` : ''}</section>`
 };
