@@ -101,37 +101,57 @@ function fmtWA(t, mapa, nombres) {
 // "Ver más" en textos largos (el estado abierto se conserva al refrescar el chat)
 const waVmAbiertos = new Set();
 const waVmEstilo = ab => ab ? 'max-height:none' : 'max-height:15em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 72%,transparent);mask-image:linear-gradient(#000 72%,transparent)';
+// imagen de una tarjeta o mensaje: enlace directo (https) o miniatura incrustada
+const waImgSrc = (iu, img) => (typeof iu === 'string' && /^https:\/\//i.test(iu)) ? iu : (typeof img === 'string' && img.startsWith('data:image/')) ? img : '';
+const waImg = (src, est) => `<img src="${esc(src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="${est}">`;
 // tarjeta de previa (enlace o "previa" que manda el bot)
 function waTarjeta(p) {
-  if (!p || !(p.t || p.b || p.img)) return '';
-  const img = typeof p.img === 'string' && p.img.startsWith('data:image/') ? `<img src="${esc(p.img)}" alt="" style="display:block;width:100%;max-height:190px;object-fit:cover">` : '';
-  const cuerpo = `${img}<span style="display:block;padding:8px 10px">${p.t ? `<b style="display:block">${esc(p.t)}</b>` : ''}${p.b ? `<span style="display:block;font-size:.85em;opacity:.8">${esc(p.b)}</span>` : ''}</span>`;
+  if (!p) return '';
+  const src = waImgSrc(p.iu, p.img);
+  if (!(p.t || p.b || src)) return '';
+  const cuerpo = `${src ? waImg(src, 'display:block;width:100%;max-height:190px;object-fit:cover') : ''}<span style="display:block;padding:8px 10px">${p.t ? `<b style="display:block">${esc(p.t)}</b>` : ''}${p.b ? `<span style="display:block;font-size:.85em;opacity:.8">${esc(p.b)}</span>` : ''}</span>`;
   const est = 'display:block;margin:6px 0;border-radius:12px;overflow:hidden;background:#00000030;white-space:normal;color:inherit;text-decoration:none';
   return urlOk(p.u) ? `<a href="${esc(p.u)}" target="_blank" rel="noopener noreferrer" style="${est}">${cuerpo}</a>` : `<span style="${est}">${cuerpo}</span>`;
 }
+// botones: al ancho del mensaje, debajo de él y pegados entre sí
+const waBtnEst = 'display:block;box-sizing:border-box;width:100%;margin:6px 0 0;text-align:center;white-space:normal;touch-action:manipulation;-webkit-tap-highlight-color:transparent';
 // todo lo que puede traer un mensaje del bot
 function waCuerpo(m) {
   let h = '';
   if (m.ar) h += waTarjeta(m.ar);
-  if (m.tp === 'i' && typeof m.src === 'string' && m.src.startsWith('data:image/')) h += `<img src="${esc(m.src)}" alt="" style="display:block;max-width:100%;border-radius:12px;margin-bottom:${m.tx ? 6 : 0}px">`;
+  const im = m.tp === 'i' ? waImgSrc(m.iu, m.src) : '';
+  if (im) h += waImg(im, `display:block;max-width:100%;border-radius:12px;margin-bottom:${m.tx ? 6 : 0}px`);
   if (m.tp === 'v' && urlOk(m.u)) h += m.gif
     ? `<video src="${esc(m.u)}" autoplay loop muted playsinline style="display:block;max-width:100%;border-radius:12px;margin-bottom:6px"></video>`
     : `<video src="${esc(m.u)}" controls playsinline preload="metadata" style="display:block;max-width:100%;border-radius:12px;margin-bottom:6px"></video>`;
   if (m.tp === 'a' && urlOk(m.u)) h += `<audio src="${esc(m.u)}" controls preload="none" style="display:block;width:100%;max-width:260px;margin-bottom:6px"></audio>`;
-  if (m.tp === 'd' && urlOk(m.u)) h += `<a class="btn sec sm" href="${esc(m.u)}" target="_blank" rel="noopener noreferrer" download style="margin-bottom:6px;white-space:normal">${esc(m.nm || 'Descargar archivo')}</a>`;
+  if (m.tp === 'd' && urlOk(m.u)) h += `<a class="btn sec sm" href="${esc(m.u)}" target="_blank" rel="noopener noreferrer" download style="${waBtnEst}">${esc(m.nm || 'Descargar archivo')}</a>`;
   if (m.tx) {
     const cuerpo = fmtWA(m.tx, m.mn);
     if (m.tx.length > 900 || (m.tx.match(/\n/g) || []).length > 16) {      // texto largo: "Ver más"
       const k = (m.t && m.t.seconds != null ? m.t.seconds + '.' + m.t.nanoseconds : 'x') + '|' + m.tx.length, ab = waVmAbiertos.has(k);
-      h += `<div data-k="${esc(k)}" style="${waVmEstilo(ab)}">${cuerpo}</div><button class="btn sec sm" data-a="vermas" style="margin-top:6px">${ab ? 'Ver menos' : 'Ver más'}</button>`;
+      h += `<div data-k="${esc(k)}" style="${waVmEstilo(ab)}">${cuerpo}</div><button class="btn sec sm" data-a="vermas" style="${waBtnEst}">${ab ? 'Ver menos' : 'Ver más'}</button>`;
     } else h += cuerpo;
   }
   if (m.lp) h += waTarjeta(m.lp);
   if (m.ft) h += `<span style="display:block;font-size:.78em;opacity:.7;margin-top:6px;white-space:normal">${esc(m.ft)}</span>`;
-  const bt = (Array.isArray(m.bt) ? m.bt : []).map(b => `<button class="btn sec sm" data-a="botbtn" data-id="${esc(b.id)}" data-l="${esc(b.l)}">${esc(b.l)}</button>`);
-  const bu = (Array.isArray(m.bu) ? m.bu : []).filter(b => urlOk(b.u)).map(b => `<a class="btn sec sm" href="${esc(b.u)}" target="_blank" rel="noopener noreferrer">${esc(b.l)}</a>`);
-  if (bt.length || bu.length) h += `<span style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;white-space:normal">${bt.join('')}${bu.join('')}</span>`;
+  const bt = (Array.isArray(m.bt) ? m.bt : []).map(b => `<button class="btn sec sm" data-a="botbtn" data-id="${esc(b.id)}" data-l="${esc(b.l)}" style="${waBtnEst}">${esc(b.l)}</button>`);
+  const bu = (Array.isArray(m.bu) ? m.bu : []).filter(b => urlOk(b.u)).map(b => `<a class="btn sec sm" href="${esc(b.u)}" target="_blank" rel="noopener noreferrer" style="${waBtnEst}">${esc(b.l)}</a>`);
+  if (bt.length || bu.length) h += `<span style="display:block;margin-top:8px;white-space:normal">${bt.join('')}${bu.join('')}</span>`;
   return h;
+}
+// una burbuja: el cuerpo se calcula una sola vez por mensaje (no se vuelve a procesar en cada redibujado)
+const waCache = new WeakMap(); let waSeq = 0;
+const waSty = b => `background:${b[2]};color:${b[3]};${b[4] || ''}`;
+function waHtmlMsg(m) {
+  if (!m._id) m._id = ++waSeq;
+  const h = horaDe(m.t) + palomita(m), me = m.de === user.uid ? ' me' : '';
+  if (m.tp === 's' && m.src) return stkOk(m.src) ? `<div class="stm${me}" id="mb${m._id}"><img src="${esc(m.src)}" alt="Sticker" width="128" height="128"><small>${h}</small></div>` : '';
+  let cuerpo = waCache.get(m);
+  if (cuerpo === undefined) { cuerpo = m.de === 'bot' ? waCuerpo(m) : fmtWA(m.tx || '', null, (Array.isArray(m.mn) ? m.mn : []).map(x => x.n)); waCache.set(m, cuerpo); }
+  const c = getCC(otro()), est = waSty(bubOf(me ? c.bm : c.bt)) + ';white-space:pre-wrap' + (m.rx ? ';position:relative;margin-bottom:18px' : '');
+  const rx = m.rx ? `<span style="position:absolute;bottom:-13px;right:10px;font-size:15px;line-height:1;background:#1b1530;border:1px solid #ffffff33;border-radius:12px;padding:2px 6px;white-space:normal">${esc(m.rx)}</span>` : '';
+  return `<div class="bub${me}" id="mb${m._id}" style="${est}">${cuerpo}${rx}<small>${h}</small></div>`;
 }
 // etiquetar con @ (solo en el chat del bot)
 let waDirU = null, waDirCarga = false, waMenc = [];
@@ -180,15 +200,15 @@ function loadChats() {
     l.forEach(c => { c.otro = c.miembros.find(u => u !== user.uid); });
     await Promise.all(l.map(c => perfOf(c.otro)));          // todos los perfiles a la vez
     const sec = c => (c.ultimo && c.ultimo.t && c.ultimo.t.seconds) || 0;
-    l.sort((x, y) => sec(y) - sec(x)); chats = l; renderSoon();
+    l.sort((x, y) => sec(y) - sec(x)); chats = l; if (!location.hash.startsWith('#chat/')) renderSoon();
   }, e => toast(errMsg(e)));
 }
 function chatsView() {
   const fila = c => {
     const esBot = c.otro === 'bot', p = perfs[c.otro] || {}, u = c.ultimo || {}, vi = (c.vistos || {})[user.uid];
-    const nuevo = !!(u.de && u.de !== user.uid && u.t && u.t.seconds && (!vi || (vi.seconds || 0) < u.t.seconds));
+    const nuevo = !esBot && !!(u.de && u.de !== user.uid && u.t && u.t.seconds && (!vi || (vi.seconds || 0) < u.t.seconds));
     const hp = esBot ? '#chat/bot' : '#u/' + esc(c.otro);
-    return `<div class="card chr"><a class="avl" href="${hp}" aria-label="Ver perfil de ${esc(p.nombre)}">${avOf(p, 52, 1)}</a><a class="chm" href="#chat/${esc(c.otro)}"><b>${esc(p.nombre)}</b>${esc_o(c.otro)}<small class="${nuevo ? 'new' : 'mu'}">${u.tp === 's' ? 'Sticker' : esc(u.tx || (esBot ? 'Usa los comandos del bot aquí' : 'Sin mensajes todavía'))}</small></a>${nuevo ? '<span class="dot" aria-label="Mensaje nuevo"></span>' : ''}</div>`;
+    return `<div class="card chr"><a class="avl" href="${hp}" aria-label="Ver perfil de ${esc(p.nombre)}">${avOf(p, 52, 1)}</a><a class="chm" href="#chat/${esc(c.otro)}"><b>${esc(p.nombre)}</b>${esc_o(c.otro)}<small class="${nuevo ? 'new' : 'mu'}">${esBot ? 'Usa los comandos del bot aquí' : u.tp === 's' ? 'Sticker' : esc(u.tx || 'Sin mensajes todavía')}</small></a>${nuevo ? '<span class="dot" aria-label="Mensaje nuevo"></span>' : ''}</div>`;
   };
   const botC = chats.find(c => c.otro === 'bot') || { otro: 'bot', miembros: [user.uid, 'bot'] };
   const resto = chats.filter(c => c.otro !== 'bot');
@@ -237,24 +257,75 @@ async function setCC(patch) {
 let chatUn = null, vistoOtro = 0, miVisto = 0;
 async function startChat() {
   const o = otro(); if (!db || !user || !o) return;
-  if (unsub && curChat === o) { pintaOpts(); aplicarChat(); draw(); return; }
+  if (unsub && curChat === o) { pintaOpts(); aplicarChat(); const e = $('#msgs'); if (!e || e._n !== msgs.length) draw(); return; }
   if (o === 'bot' && curChat === o && !unsub) return;      // ya se está preparando
   if (unsub) unsub(); if (chatUn) chatUn();
   curChat = o; msgs = []; vistoOtro = 0; miVisto = 0; oc = { open: false, tab: null, who: 'me' };
+  if (o === 'bot') { waStartBot(); return; }
   const cref = db.collection('chats').doc(cidOf(o));
-  if (o === 'bot' && !botOk) {
-    try { await cref.set({ miembros: [user.uid, 'bot'] }, { merge: true }); botOk = true; }
-    catch (e) { curChat = null; toast(errMsg(e)); return; }
-    if (curChat !== o) return;
-  }
   unsub = cref.collection('msgs').orderBy('t').limitToLast(o === 'bot' ? 40 : 100).onSnapshot(s => { msgs = s.docs.map(d => d.data()); draw(); marcaVisto(); }, e => toast(errMsg(e)));
   // cuándo vio el otro los mensajes (para las palomitas)
   chatUn = cref.onSnapshot(s => { const v = ((s.data() || {}).vistos || {})[o], n = v && v.seconds ? v.seconds * 1000 : 0; if (n !== vistoOtro) { vistoOtro = n; if (msgs.length) draw(); } }, () => {});
   draw(); loadBg(o);
 }
+// ───────── chat con el bot: efímero ─────────
+// Firebase solo hace de "tubería": tu mensaje y la respuesta pasan por ahí unos segundos y el bot los borra.
+// Lo que ves vive solo en esta pantalla: al salir del chat desaparece.
+let waBotP = null;
+function waBotChat() {
+  if (!waBotP) {
+    const FV = firebase.firestore.FieldValue;
+    waBotP = db.collection('chats').doc(cidOf('bot')).set({ miembros: [user.uid, 'bot'], ultimo: FV.delete(), vistos: FV.delete() }, { merge: true }).catch(e => { waBotP = null; throw e; });
+  }
+  return waBotP;
+}
+function waPinta(m) {
+  const el = $('#msgs'); if (!el) return;
+  if (!el._n) el.innerHTML = '';                          // quita el aviso de "vacío"
+  el.insertAdjacentHTML('beforeend', waHtmlMsg(m)); el._n = msgs.length;
+  if (el._peg !== false || m.de === user.uid) { el._peg = true; pega(el); }
+}
+function waReacciona(id, em) {
+  const m = msgs.find(x => x.cl === id || x.ci === id); if (!m) return;
+  m.rx = em || '';
+  const n = document.getElementById('mb' + m._id); if (n) n.outerHTML = waHtmlMsg(m);
+}
+function waVisto() {                                      // el bot ya respondió: palomitas de "visto"
+  vistoOtro = Date.now();
+  document.querySelectorAll('#msgs .bub.me .tk:not(.v)').forEach(t => { t.classList.add('v'); t.innerHTML = ic('check2', 15); t.setAttribute('aria-label', 'Visto'); });
+}
+async function waStartBot() {
+  draw();                                                 // la pantalla queda lista al instante
+  try { await waBotChat(); } catch (e) { curChat = null; toast(errMsg(e)); return; }
+  if (curChat !== 'bot') return;
+  let primera = true;
+  unsub = db.collection('chats').doc(cidOf('bot')).collection('msgs').orderBy('t').limitToLast(30).onSnapshot(s => {
+    if (primera) { if (!s.metadata.fromCache) primera = false; return; }   // lo que hubiera de antes se ignora
+    let nuevo = false;
+    for (const ch of s.docChanges()) {
+      if (ch.type !== 'added') continue;
+      const d = ch.doc.data();
+      if (d.de !== 'bot') continue;
+      if (d.tp === 'r') { waReacciona(d.re, d.em); continue; }
+      msgs.push(d); waPinta(d); nuevo = true;
+    }
+    if (nuevo) waVisto();
+  }, e => toast(errMsg(e)));
+}
+async function waEnviarBot(m) {
+  const cl = Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-4);
+  const loc = { de: user.uid, tp: 't', tx: m.tx || '', cl, t: firebase.firestore.Timestamp.now() };
+  if (Array.isArray(m.mn) && m.mn.length) loc.mn = m.mn;
+  msgs.push(loc); waPinta(loc);                           // aparece al instante, sin esperar a la red
+  const ref = db.collection('chats').doc(cidOf('bot')), ts = firebase.firestore.FieldValue.serverTimestamp();
+  const doc = { de: user.uid, tp: 't', t: ts, tx: loc.tx, cl };
+  if (m.bid) doc.bid = m.bid; if (loc.mn) doc.mn = loc.mn;
+  try { await waBotChat(); await ref.collection('msgs').add(doc); ref.set({ ping: ts }, { merge: true }).catch(() => {}); }
+  catch (e) { toast(errMsg(e)); }
+}
 // Avisa que ya viste los mensajes del otro
 function marcaVisto() {
-  if (document.hidden || !curChat || !user || !db) return;
+  if (document.hidden || !curChat || curChat === 'bot' || !user || !db) return;
   let ult = 0; for (const m of msgs) if (m.de !== user.uid && m.t && m.t.seconds) ult = Math.max(ult, m.t.seconds * 1000);
   if (ult && ult > miVisto) { miVisto = ult; db.collection('chats').doc(cidOf(curChat)).set({ vistos: { [user.uid]: firebase.firestore.FieldValue.serverTimestamp() } }, { merge: true }).catch(() => {}); }
 }
@@ -273,17 +344,14 @@ function draw() {
   const peg = el._peg !== false, ult = msgs[msgs.length - 1];
   const c = getCC(otro()), sm = bubOf(c.bm), st = bubOf(c.bt);
   const sty = b => `background:${b[2]};color:${b[3]};${b[4] || ''}`;
-  el.innerHTML = msgs.length ? msgs.map(m => {
-    const h = horaDe(m.t) + palomita(m), me = m.de === user.uid ? ' me' : '';
-    if (m.tp === 's' && m.src) return stkOk(m.src) ? `<div class="stm${me}"><img src="${esc(m.src)}" alt="Sticker" width="128" height="128"><small>${h}</small></div>` : '';
-    const bot = m.de === 'bot', est = sty(me ? sm : st) + ';white-space:pre-wrap';
-    return `<div class="bub${me}" style="${est}">${bot ? waCuerpo(m) : fmtWA(m.tx || '', null, (Array.isArray(m.mn) ? m.mn : []).map(x => x.n))}<small>${h}</small></div>`;
-  }).join('') : `<p class="mu vacio">${ic('chat', 30)}<span>Escribe el primer mensaje</span></p>`;
+  el.innerHTML = msgs.length ? msgs.map(waHtmlMsg).join('') : `<p class="mu vacio">${ic('chat', 30)}<span>${otro() === 'bot' ? 'Escribe un comando, ej: .menu' : 'Escribe el primer mensaje'}</span></p>`;
+  el._n = msgs.length;
   if (peg || !el._pos || (ult && ult.de === user.uid)) { el._pos = 1; el._peg = true; pega(el); }
 }
 // m = { tx, tp:'t' } o { src, tp:'s' }
 async function enviar(m) {
   const o = otro(); if (!m || (!m.tx && !m.src)) return;
+  if (o === 'bot') return waEnviarBot(m);
   const ref = db.collection('chats').doc(cidOf(o)), ts = firebase.firestore.FieldValue.serverTimestamp();
   const doc = { de: user.uid, tp: m.tp, t: ts }; if (m.tx) doc.tx = m.tx; if (m.src) doc.src = m.src; if (m.bid) doc.bid = m.bid; if (Array.isArray(m.mn) && m.mn.length) doc.mn = m.mn;
   try {
@@ -314,16 +382,22 @@ MODS.push(async (a, t) => {
     if (!p.hidden) { oc.open = false; pintaOpts(); p.innerHTML = panHtml(); cargarStickers(); }
     return true;
   }
-  if (a === 'botbtn') { await enviar({ tx: t.dataset.l, tp: 't', bid: t.dataset.id }); return true; }
+  if (a === 'botbtn') {                                    // respuesta inmediata: se ve al tocar, sin esperar a la red
+    if (t._busy) return true;
+    t._busy = 1; t.style.opacity = '.55'; setTimeout(() => { t._busy = 0; t.style.opacity = ''; }, 900);
+    enviar({ tx: t.dataset.l, tp: 't', bid: t.dataset.id });
+    return true;
+  }
   if (a === 'vermas') {
     const box = t.previousElementSibling; if (!box) return true;
+    const bub = t.closest('.bub'), mm = bub && msgs.find(x => 'mb' + x._id === bub.id); if (mm) waCache.delete(mm);
     const k = box.dataset.k, ab = !waVmAbiertos.has(k);
     if (ab) waVmAbiertos.add(k); else waVmAbiertos.delete(k);
     box.setAttribute('style', waVmEstilo(ab)); t.textContent = ab ? 'Ver menos' : 'Ver más';
     return true;
   }
   if (a === 'mnpick') { waMpElige(t.dataset.k, t.dataset.n); return true; }
-  if (a === 'send') { const i = $('#cm'), v = i.value.trim(); i.value = ''; const mn = otro() === 'bot' ? waMenc.filter(x => v.includes('@' + x.n)).map(x => ({ k: x.k, n: x.n })) : []; waMenc = []; waMpHide(); await enviar({ tx: v, tp: 't', mn }); return true; }
+  if (a === 'send') { const i = $('#cm'), v = i.value.trim(); i.value = ''; const mn = otro() === 'bot' ? waMenc.filter(x => v.includes('@' + x.n)).map(x => ({ k: x.k, n: x.n })) : []; waMenc = []; waMpHide(); enviar({ tx: v, tp: 't', mn }); return true; }
   if (a === 'addfriend') {
     const id = ($('#fid').value || '').trim();
     if (!id) { toast('Escribe el ID de tu amigo.'); return true; }
@@ -341,4 +415,4 @@ MODS.push(async (a, t) => {
   return false;
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'cm') { e.preventDefault(); document.querySelector('[data-a=send]').click(); } });
-window.addEventListener('hashchange', () => { if (!location.hash.startsWith('#chat/') && unsub) { unsub(); unsub = null; curChat = null; if (chatUn) { chatUn(); chatUn = null; } } });
+window.addEventListener('hashchange', () => { if (!location.hash.startsWith('#chat/') && (unsub || curChat)) { if (unsub) unsub(); unsub = null; curChat = null; msgs = []; waMenc = []; if (chatUn) { chatUn(); chatUn = null; } } });
