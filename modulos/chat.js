@@ -98,6 +98,9 @@ function fmtWA(t, mapa, nombres) {
   for (let i = 0; i < 3 && /\u0000\d+\u0000/.test(out); i++) out = out.replace(/\u0000(\d+)\u0000/g, (_, k) => hold[k]);
   return out;
 }
+// "Ver más" en textos largos (el estado abierto se conserva al refrescar el chat)
+const vmAbiertos = new Set();
+const vmEstilo = ab => ab ? 'max-height:none' : 'max-height:15em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 72%,transparent);mask-image:linear-gradient(#000 72%,transparent)';
 // tarjeta de previa (enlace o "previa" que manda el bot)
 function tarjetaPrev(p) {
   if (!p || !(p.t || p.b || p.img)) return '';
@@ -116,7 +119,13 @@ function cuerpoBot(m) {
     : `<video src="${esc(m.u)}" controls playsinline preload="metadata" style="display:block;max-width:100%;border-radius:12px;margin-bottom:6px"></video>`;
   if (m.tp === 'a' && urlOk(m.u)) h += `<audio src="${esc(m.u)}" controls preload="none" style="display:block;width:100%;max-width:260px;margin-bottom:6px"></audio>`;
   if (m.tp === 'd' && urlOk(m.u)) h += `<a class="btn sec sm" href="${esc(m.u)}" target="_blank" rel="noopener noreferrer" download style="margin-bottom:6px;white-space:normal">${esc(m.nm || 'Descargar archivo')}</a>`;
-  if (m.tx) h += fmtWA(m.tx, m.mn);
+  if (m.tx) {
+    const cuerpo = fmtWA(m.tx, m.mn);
+    if (m.tx.length > 900 || (m.tx.match(/\n/g) || []).length > 16) {      // texto largo: "Ver más"
+      const k = (m.t && m.t.seconds != null ? m.t.seconds + '.' + m.t.nanoseconds : 'x') + '|' + m.tx.length, ab = vmAbiertos.has(k);
+      h += `<div data-k="${esc(k)}" style="${vmEstilo(ab)}">${cuerpo}</div><button class="btn sec sm" data-a="vermas" style="margin-top:6px">${ab ? 'Ver menos' : 'Ver más'}</button>`;
+    } else h += cuerpo;
+  }
   if (m.lp) h += tarjetaPrev(m.lp);
   if (m.ft) h += `<span style="display:block;font-size:.78em;opacity:.7;margin-top:6px;white-space:normal">${esc(m.ft)}</span>`;
   const bt = (Array.isArray(m.bt) ? m.bt : []).map(b => `<button class="btn sec sm" data-a="botbtn" data-id="${esc(b.id)}" data-l="${esc(b.l)}">${esc(b.l)}</button>`);
@@ -306,6 +315,13 @@ MODS.push(async (a, t) => {
     return true;
   }
   if (a === 'botbtn') { await enviar({ tx: t.dataset.l, tp: 't', bid: t.dataset.id }); return true; }
+  if (a === 'vermas') {
+    const box = t.previousElementSibling; if (!box) return true;
+    const k = box.dataset.k, ab = !vmAbiertos.has(k);
+    if (ab) vmAbiertos.add(k); else vmAbiertos.delete(k);
+    box.setAttribute('style', vmEstilo(ab)); t.textContent = ab ? 'Ver menos' : 'Ver más';
+    return true;
+  }
   if (a === 'mnpick') { mpElige(t.dataset.k, t.dataset.n); return true; }
   if (a === 'send') { const i = $('#cm'), v = i.value.trim(); i.value = ''; const mn = otro() === 'bot' ? menc.filter(x => v.includes('@' + x.n)).map(x => ({ k: x.k, n: x.n })) : []; menc = []; mpHide(); await enviar({ tx: v, tp: 't', mn }); return true; }
   if (a === 'addfriend') {
