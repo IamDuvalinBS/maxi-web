@@ -14,7 +14,7 @@ function adEspera() {
     const b = $('#adb'); if (!b) return clearInterval(t);
     s--; b.textContent = 'Espera ' + s + ' s…';
     if (s <= 0) {
-      clearInterval(t); const st = stats(); st.ads++; gStats();
+      clearInterval(t); const st = stats(); st.ads++; gStats(); if (typeof paseAnuncio === 'function') paseAnuncio();
       const n = $('#adn'); if (n) n.textContent = st.ads;
       adReset(); if ([10, 20].includes(st.ads)) { toast('¡Misión completada! Reclama tu banner en esta pantalla.'); render(); }
     }

@@ -23,7 +23,7 @@ function publicoView() {
   const pj = s.pj || {}, jug = Object.keys(JG).filter(k => (s.pp || {})[k]).sort((x, y) => (pj[y] || 0) - (pj[x] || 0)).slice(0, 5);
   return back + `<section class="card pr"><div class="pb" style="background:${portada}"></div>
     <div class="pa"><span class="av${marcoDe(p)}" style="width:96px;height:96px;font-size:38px">${p.avatar && imgOk(p.avatar) ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : inicial(p.nombre)}</span></div>
-    <div class="in"><div class="pn2">${esc(p.nombre || 'Usuario')}${esOwner(uid) ? ' ' + vf() : ''}</div>${p.bio ? `<p class="mu" style="text-align:center;overflow-wrap:anywhere">${esc(p.bio)}</p>` : ''}
+    <div class="in"><div class="pn2">${esc(p.nombre || 'Usuario')}${esOwner(uid) ? ' ' + vf() : ''}${typeof insHtml === 'function' ? insHtml(eq.ins, 24) : ''}</div>${p.bio ? `<p class="mu" style="text-align:center;overflow-wrap:anywhere">${esc(p.bio)}</p>` : ''}
     <div class="sr"><div>NIVEL<b>${1 + Math.floor(min / 5)}</b></div><div>DÍAS AQUÍ<b>${dias}</b></div><div>MINUTOS<b>${Math.floor(min)}</b></div></div>
     <div class="row"><button class="btn" data-a="msgto" data-id="${esc(uid)}">${ic('chat', 18)}Enviar mensaje</button></div></div></section>` +
     (jug.length ? `<section class="card"><div class="ti sm">${ic('game', 22)}<span>Juega mucho</span></div>${jug.map(k => { const g = JG[k], m = Math.floor(pj[k] || 0); return `<div class="er"><span class="gic">${ic(g.ic, 24)}</span><div style="flex:1;min-width:0"><b>${g.n}</b> <span class="mu">Nivel ${1 + Math.floor(m / 5)}</span><small class="mu" style="display:block">${m} min jugados</small></div></div>`; }).join('')}</section>` : '');
