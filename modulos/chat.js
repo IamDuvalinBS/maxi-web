@@ -301,6 +301,11 @@ function waEdita(d) {                                     // el bot editó un me
   for (const k of WA_CAMPOS) { if (k in d) m[k] = d[k]; else if (!['qr', 'qt', 'qd'].includes(k)) delete m[k]; }   // la cita original se conserva
   m.edit = true; waCache.delete(m); waRepinta(m);
 }
+function waPrevia(id, lp) {                              // la previa de un enlace llegó después del mensaje
+  const m = waBusca(id); if (!m || !lp) return;
+  m.lp = lp; waCache.delete(m); waRepinta(m);
+  const el = waEnChat() ? $('#msgs') : null; if (el && el._peg !== false) pega(el);
+}
 function waBorra(id) {                                    // el bot borró un mensaje
   const i = waBotMsgs.findIndex(x => x.cl === id || x.ci === id); if (i < 0) return;
   const [m] = waBotMsgs.splice(i, 1);
@@ -330,6 +335,7 @@ function waEscuchaBot() {
       ch.doc.ref.delete().catch(() => {});                // ya está en tu pantalla: no se guarda nada en Firebase
       if (d.tp === 'r') waReacciona(d.re, d.em);
       else if (d.tp === 'x') waBorra(d.re);
+      else if (d.tp === 'p') waPrevia(d.re, d.lp);
       else if (d.ed) waEdita(d);
       else { waBotMsgs.push(d); waPinta(d); nuevo = true; if (!waEnChat()) waBotNuevos++; }
     }
