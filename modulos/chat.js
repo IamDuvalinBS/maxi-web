@@ -2,6 +2,7 @@
 let chats = [], unsub = null, msgs = [], curChat = null;
 const waBotMsgs = [];                     // mensajes del chat con el bot: solo en memoria, hasta recargar la página
 let waBotUn = null, waBotUid = null, waBotNuevos = 0;
+const waCopias = new Map(); let waAvisoCopia = false;   // ids de las copias del bot que responden (si hay más de una a la vez, se avisa)
 const waLista = () => otro() === 'bot' ? waBotMsgs : msgs;
 const perfs = {}, bgImgs = {};
 perfs.bot = { nombre: 'Mambo Bot', avatar: 'img/logo.jpg' };   // chat con el bot (comandos)
@@ -306,6 +307,10 @@ function waPrevia(id, lp) {                              // la previa de un enla
   m.lp = lp; waCache.delete(m); waRepinta(m);
   const el = waEnChat() ? $('#msgs') : null; if (el && el._peg !== false) pega(el);
 }
+function waAviso(texto) {                                 // aviso local (no viene de Firebase)
+  const m = { de: 'bot', tp: 't', tx: texto, t: firebase.firestore.Timestamp.now(), local: true };
+  waBotMsgs.push(m); waPinta(m); if (!waEnChat()) waBotNuevos++;
+}
 function waBorra(id) {                                    // el bot borró un mensaje
   const i = waBotMsgs.findIndex(x => x.cl === id || x.ci === id); if (i < 0) return;
   const [m] = waBotMsgs.splice(i, 1);
@@ -333,6 +338,13 @@ function waEscuchaBot() {
       const d = ch.doc.data();
       if (d.de !== 'bot') continue;
       ch.doc.ref.delete().catch(() => {});                // ya está en tu pantalla: no se guarda nada en Firebase
+      const bi = d.bi || 'vieja', ahora = Date.now();     // ¿responden dos copias del bot a la vez?
+      if (!waAvisoCopia) for (const [k, v] of waCopias) if (k !== bi && ahora - v < 90000) {
+        waAvisoCopia = true;
+        waAviso('*Aviso:* hay más de una copia de tu bot respondiendo este chat (por eso ves respuestas repetidas o que llegan a WhatsApp). Apaga las demás: otras sesiones de Termux, un hosting (Render, Replit…) u otro celular.');
+        break;
+      }
+      waCopias.set(bi, ahora);
       if (d.tp === 'r') waReacciona(d.re, d.em);
       else if (d.tp === 'x') waBorra(d.re);
       else if (d.tp === 'p') waPrevia(d.re, d.lp);
