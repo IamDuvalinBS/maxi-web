@@ -47,6 +47,8 @@ function escuchaWA() {
   if (!db || !user || waUn.length) return;
   waUn.push(db.collection('botperfil').doc(user.uid).onSnapshot(s => { waPerfil = s.exists ? s.data() : null; renderSoon(); }, () => {}));
   waUn.push(db.collection('botlink').doc(user.uid).onSnapshot(s => { waLink = s.exists; renderSoon(); }, () => {}));
+  waUn.push(db.collection('bot').doc('codigo').onSnapshot(s => { if (s.exists && s.data().min) codeCfg = { min: Number(s.data().min) || 15 }; renderSoon(); }, () => {}));
+  waUn.push(db.collection('perfiles').doc(user.uid).onSnapshot(s => { if (perfil && s.exists && (s.data().codeUsos || 0) !== (perfil.codeUsos || 0)) { perfil.codeUsos = s.data().codeUsos || 0; renderSoon(); } }, () => {}));
 }
 function soltarWA() { waUn.forEach(f => f()); waUn = []; waPerfil = null; waLink = false; waCode = null; }
 function waCard() {
@@ -78,3 +80,20 @@ MODS.push(async (a, t) => {
   }
   return false;
 });
+
+// ---------- Misión que desbloquea .code (pedir código de subbot en WhatsApp) ----------
+// El bot lee tus minutos en juegos patrocinadores y cuántos códigos ya pediste (perfiles/{uid}.codeUsos).
+let codeCfg = { min: 15 };
+function codeMin() {
+  const s = typeof stats === 'function' ? stats() : { pj: {} }, j = (perfil && perfil.juegos) || {};
+  return Object.keys(JG).filter(k => JG[k].ext).reduce((a, k) => a + Math.max((j[k] && j[k].minutos) || 0, s.pj[k] || 0), 0);
+}
+function codeMisionCard() {
+  if (!user || !perfil) return '';
+  const meta = codeCfg.min || 15, usos = perfil.codeUsos || 0, prog = Math.max(0, codeMin() - meta * usos), ok = prog >= meta;
+  const estado = owner ? `<span class="ok">${ic('crown', 14)} Owner: puedes pedir .code sin misión</span>`
+    : !waLink ? `<span class="mu">Vincula tu WhatsApp para que el bot reconozca tu progreso.</span><a class="btn sec sm" href="#perfil">Vincular</a>`
+    : ok ? `<span class="ok">${ic('check', 14)} Misión completa</span><span class="mu">Escribe <b>.code tu_número</b> en el bot.</span>`
+    : `<a class="btn sm" href="#juegos">Jugar ahora</a>`;
+  return `<section class="card ms"><div class="mt"><b>${ic('bot', 18)} Misión · Desbloquea .code</b><span class="mu">${owner ? meta : Math.min(Math.floor(prog), meta)}/${meta} min</span></div><p class="mu">Juega ${meta} minutos a un juego de nuestro patrocinador para poder pedir un código de vinculación (<b>.code</b>) en el bot. Cada código nuevo necesita completar la misión otra vez.</p><div class="jbar"><div style="transform:scaleX(${owner ? 1 : Math.min(1, prog / meta)})"></div></div><div class="mr">${estado}</div></section>`;
+}

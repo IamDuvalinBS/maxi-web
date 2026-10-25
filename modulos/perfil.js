@@ -60,7 +60,7 @@ window.addEventListener('pagehide', () => { if (TJ) { acumula(); gStats(); } });
 // ---- Pantallas ----
 function misionesView() {
   const s = stats(), rc = perfil.rec || {};
-  return `<section class="card"><div class="ti">${ic('target', 24)}<span>Misiones</span></div><p class="mu">Juega y gana cosméticos para tu perfil. Se guardan para siempre en tu cuenta.</p></section>` + MIS.map(m => {
+  return `<section class="card"><div class="ti">${ic('target', 24)}<span>Misiones</span></div><p class="mu">Juega y gana cosméticos para tu perfil. Se guardan para siempre en tu cuenta.</p></section>` + (typeof codeMisionCard === 'function' ? codeMisionCard() : '') + MIS.map(m => {
     const p = owner ? m.meta : Math.floor(m.f(s)), ok = p >= m.meta;
     return `<section class="card ms"><div class="mt"><b>${m.t}</b><span class="mu">${Math.min(p, m.meta)}/${m.meta} ${m.u}</span></div><p class="mu">${m.d}</p><div class="jbar"><div style="transform:scaleX(${Math.min(1, p / m.meta)})"></div></div><div class="mr"><span class="gi">${ic('gift', 18)}</span>${cosPrev(m.rec)}<span>${esc(COS[m.rec].n)}</span>${owner ? `<span class="ok">${ic('crown', 14)} Desbloqueada (owner)</span>` : rc[m.id] ? `<span class="ok">${ic('check', 14)} Reclamada</span>` : ok ? `<button class="btn" data-a="reclamar" data-id="${m.id}">Reclamar</button>` : ''}</div></section>`;
   }).join('') + (typeof anunciosView === 'function' ? anunciosView() : '');
