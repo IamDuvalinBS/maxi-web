@@ -1,5 +1,5 @@
 // Caché para que la página abra casi al instante después de la primera visita.
-const V = 'mb-v29';
+const V = 'mb-v32';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== V).map(x => caches.delete(x)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {
