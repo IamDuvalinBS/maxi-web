@@ -329,14 +329,18 @@ function waEscuchaBot() {
   if (waBotUid && waBotUid !== user.uid) waBotMsgs.length = 0;
   waBotUid = user.uid;
   let primera = true;
+  let desde = 0; const vistos = new Set();   // ids ya mostrados: Firestore re-entrega mensajes viejos al borrar los nuevos (ventana limitToLast)
   waBotUn = db.collection('chats').doc(cidOf('bot')).collection('msgs').orderBy('t').limitToLast(30).onSnapshot(s => {
-    if (primera) { if (!s.metadata.fromCache) primera = false; return; }   // lo que hubiera de antes se ignora
+    if (primera) { s.docs.forEach(x => { vistos.add(x.id); const t = x.data().t; if (t && t.toMillis) desde = Math.max(desde, t.toMillis()); }); if (!s.metadata.fromCache) primera = false; return; }   // lo que hubiera de antes se ignora
     if (!user || user.uid !== waBotUid) return;
     let nuevo = false;
     for (const ch of s.docChanges()) {
-      if (ch.type !== 'added') continue;
+      if (ch.type !== 'added' || vistos.has(ch.doc.id)) continue;
+      vistos.add(ch.doc.id);
       const d = ch.doc.data();
       if (d.de !== 'bot') continue;
+      const ms = d.t && d.t.toMillis ? d.t.toMillis() : 0;
+      if (ms && ms <= desde) { ch.doc.ref.delete().catch(() => {}); continue; }   // mensaje viejo que quedó guardado: no se vuelve a pintar
       ch.doc.ref.delete().catch(() => {});                // ya está en tu pantalla: no se guarda nada en Firebase
       const bi = d.bi || 'vieja', ahora = Date.now();     // ¿responden dos copias del bot a la vez?
       if (!waAvisoCopia) for (const [k, v] of waCopias) if (k !== bi && ahora - v < 90000) {

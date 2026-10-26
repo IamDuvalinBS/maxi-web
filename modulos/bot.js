@@ -42,16 +42,16 @@ document.addEventListener('input', e => {
 });
 
 // ---------- Vincular WhatsApp con la cuenta de la página ----------
-let waPerfil = null, waLink = false, waCode = null, waUn = [];
+let waPerfil = null, waLink = null, waCode = null, waUn = [];
 function escuchaWA() {
   if (!db || !user || waUn.length) return;
-  waUn.push(db.collection('botperfil').doc(user.uid).onSnapshot(s => { waPerfil = s.exists ? s.data() : null; renderSoon(); }, () => {}));
-  waUn.push(db.collection('botlink').doc(user.uid).onSnapshot(s => { waLink = s.exists; renderSoon(); }, () => {}));
-  waUn.push(db.collection('bot').doc('codigo').onSnapshot(s => { if (s.exists && s.data().min) codeCfg = { min: Number(s.data().min) || 15 }; renderSoon(); }, () => {}));
-  waUn.push(db.collection('perfiles').doc(user.uid).onSnapshot(s => { if (perfil && s.exists && (s.data().codeUsos || 0) !== (perfil.codeUsos || 0)) { perfil.codeUsos = s.data().codeUsos || 0; renderSoon(); } }, () => {}));
+  waUn.push(db.collection('botperfil').doc(user.uid).onSnapshot(s => { if (!s.exists && s.metadata.fromCache) return; waPerfil = s.exists ? s.data() : null; renderSoon(); }, () => {}));
+  waUn.push(db.collection('botlink').doc(user.uid).onSnapshot(s => { if (!s.exists && s.metadata.fromCache) return; waLink = s.exists; renderSoon(); }, () => {}));
+  waUn.push(db.collection('perfiles').doc(user.uid).onSnapshot(s => { const d = s.exists ? s.data() : null; if (!perfil || !d) return; const m = d.codeMision || null, ch = (d.codeUlt || 0) !== (perfil.codeUlt || 0) || (m && m.id) !== (perfil.codeMision && perfil.codeMision.id); perfil.codeUsos = d.codeUsos || 0; perfil.codeUlt = d.codeUlt || 0; perfil.codeUltId = d.codeUltId || null; perfil.codeMision = m; if (ch) renderSoon(); }, () => {}));
 }
-function soltarWA() { waUn.forEach(f => f()); waUn = []; waPerfil = null; waLink = false; waCode = null; }
+function soltarWA() { waUn.forEach(f => f()); waUn = []; waPerfil = null; waLink = null; waCode = null; }
 function waCard() {
+  if (waLink === null) return '';             // aún no sabemos si está vinculado (evita parpadeos al recargar)
   if (!botEst && !waLink) return '';          // el bot aún no está conectado a la página
   const hd = `<div class="ti sm">${ic('chat', 22)}<span>Mi WhatsApp</span></div>`;
   if (waLink) {
@@ -81,19 +81,59 @@ MODS.push(async (a, t) => {
   return false;
 });
 
-// ---------- Misión que desbloquea .code (pedir código de subbot en WhatsApp) ----------
-// El bot lee tus minutos en juegos patrocinadores y cuántos códigos ya pediste (perfiles/{uid}.codeUsos).
-let codeCfg = { min: 15 };
-function codeMin() {
-  const s = typeof stats === 'function' ? stats() : { pj: {} }, j = (perfil && perfil.juegos) || {};
-  return Object.keys(JG).filter(k => JG[k].ext).reduce((a, k) => a + Math.max((j[k] && j[k].minutos) || 0, s.pj[k] || 0), 0);
+// ---------- Misiones que desbloquean .code (pedir código de subbot en WhatsApp) ----------
+// Cada misión sale al azar, todas son de juegos/anuncios de nuestro patrocinador. Al pedir un código se gasta la misión y hay
+// 1 día de espera; luego toca otra distinta. El bot revisa el progreso (misma lista en src/subbots/gestor.js → MISIONES).
+const CODE_CD = 24 * 3600000;
+const CODE_MIS = {
+  f1: { n: 'fácil', tipo: 'par', meta: 3, t: 'Completa 3 partidas en juegos del patrocinador', u: 'partidas' },
+  f2: { n: 'fácil', tipo: 'min', meta: 5, t: 'Juega 5 minutos a juegos del patrocinador', u: 'min' },
+  f3: { n: 'fácil', tipo: 'ads', meta: 3, t: 'Mira 3 anuncios del patrocinador', u: 'anuncios' },
+  m1: { n: 'media', tipo: 'min', meta: 15, t: 'Juega 15 minutos a juegos del patrocinador', u: 'min' },
+  m2: { n: 'media', tipo: 'dist', meta: 2, t: 'Prueba 2 juegos distintos del patrocinador (3 min en cada uno)', u: 'juegos' },
+  m3: { n: 'media', tipo: 'ads', meta: 8, t: 'Mira 8 anuncios del patrocinador', u: 'anuncios' },
+  m4: { n: 'media', tipo: 'uno', meta: 10, t: 'Juega 10 minutos en un mismo juego del patrocinador', u: 'min' },
+  d1: { n: 'difícil', tipo: 'min', meta: 30, t: 'Juega 30 minutos a juegos del patrocinador', u: 'min' },
+  d2: { n: 'difícil', tipo: 'dist', meta: 4, t: 'Prueba 4 juegos distintos del patrocinador (3 min en cada uno)', u: 'juegos' },
+  d3: { n: 'difícil', tipo: 'ads', meta: 15, t: 'Mira 15 anuncios del patrocinador', u: 'anuncios' },
+  d4: { n: 'difícil', tipo: 'uno', meta: 20, t: 'Juega 20 minutos en un mismo juego del patrocinador', u: 'min' }
+};
+const codeSp = () => Object.keys(JG).filter(k => JG[k].ext);
+function codeBase() {
+  const s = typeof stats === 'function' ? stats() : { pj: {}, pp: {}, ads: 0 }, pj = {}, pp = {};
+  for (const k of codeSp()) { pj[k] = s.pj[k] || 0; pp[k] = s.pp[k] || 0; }
+  return { pj, pp, ads: s.ads || 0 };
+}
+function codeProg(m) {
+  const s = typeof stats === 'function' ? stats() : { pj: {}, pp: {}, ads: 0 }, b = (perfil.codeMision && perfil.codeMision.base) || {}, bj = b.pj || {}, bp = b.pp || {};
+  const d = k => Math.max(0, (s.pj[k] || 0) - (bj[k] || 0)), ks = codeSp();
+  if (m.tipo === 'min') return ks.reduce((a, k) => a + d(k), 0);
+  if (m.tipo === 'uno') return ks.reduce((a, k) => Math.max(a, d(k)), 0);
+  if (m.tipo === 'dist') return ks.filter(k => d(k) >= 3).length;
+  if (m.tipo === 'par') return ks.reduce((a, k) => a + Math.max(0, (s.pp[k] || 0) - (bp[k] || 0)), 0);
+  return Math.max(0, (s.ads || 0) - (b.ads || 0));
+}
+let codeAsignando = false;
+function codeAsigna() {          // elige una misión al azar distinta a la última que se hizo
+  if (codeAsignando) return; codeAsignando = true;
+  const ids = Object.keys(CODE_MIS).filter(k => k !== perfil.codeUltId), id = ids[Math.floor(Math.random() * ids.length)];
+  const m = { id, base: codeBase(), t: Date.now() };
+  perfil.codeMision = m;
+  db.collection('perfiles').doc(user.uid).set({ codeMision: m }, { merge: true }).catch(() => { perfil.codeMision = null; }).finally(() => { codeAsignando = false; renderSoon(); });
 }
 function codeMisionCard() {
   if (!user || !perfil) return '';
-  const meta = codeCfg.min || 15, usos = perfil.codeUsos || 0, prog = Math.max(0, codeMin() - meta * usos), ok = prog >= meta;
-  const estado = owner ? `<span class="ok">${ic('crown', 14)} Owner: puedes pedir .code sin misión</span>`
-    : !waLink ? `<span class="mu">Vincula tu WhatsApp para que el bot reconozca tu progreso.</span><a class="btn sec sm" href="#perfil">Vincular</a>`
-    : ok ? `<span class="ok">${ic('check', 14)} Misión completa</span><span class="mu">Escribe <b>.code tu_número</b> en el bot.</span>`
-    : `<a class="btn sm" href="#juegos">Jugar ahora</a>`;
-  return `<section class="card ms"><div class="mt"><b>${ic('bot', 18)} Misión · Desbloquea .code</b><span class="mu">${owner ? meta : Math.min(Math.floor(prog), meta)}/${meta} min</span></div><p class="mu">Juega ${meta} minutos a un juego de nuestro patrocinador para poder pedir un código de vinculación (<b>.code</b>) en el bot. Cada código nuevo necesita completar la misión otra vez.</p><div class="jbar"><div style="transform:scaleX(${owner ? 1 : Math.min(1, prog / meta)})"></div></div><div class="mr">${estado}</div></section>`;
+  const hd = `<b>${ic('bot', 18)} Misión · Desbloquea .code</b>`, intro = `<p class="mu">Completa la misión del patrocinador para pedir un código de vinculación (<b>.code</b>) en el bot. Cada código gasta la misión y hay 1 día de espera antes de la siguiente (siempre distinta).</p>`;
+  if (owner) return `<section class="card ms"><div class="mt">${hd}</div>${intro}<div class="mr"><span class="ok">${ic('crown', 14)} Owner: puedes pedir .code sin misión</span></div></section>`;
+  if (!waLink) return `<section class="card ms"><div class="mt">${hd}</div>${intro}<div class="mr"><span class="mu">${waLink === null ? 'Cargando…' : 'Vincula tu WhatsApp para que el bot reconozca tu progreso.'}</span>${waLink === null ? '' : '<a class="btn sec sm" href="#perfil">Vincular</a>'}</div></section>`;
+  const resta = (perfil.codeUlt || 0) + CODE_CD - Date.now();
+  if (resta > 0) {
+    const h = Math.floor(resta / 3600000), mi = Math.ceil((resta % 3600000) / 60000);
+    return `<section class="card ms"><div class="mt">${hd}<span class="mu">Cooldown</span></div>${intro}<div class="mr"><span class="mu">Tu próxima misión estará lista en <b>${h > 0 ? h + ' h ' : ''}${mi} min</b>.</span></div></section>`;
+  }
+  const cm = perfil.codeMision, m = cm && CODE_MIS[cm.id];
+  if (!m) { codeAsigna(); return `<section class="card ms"><div class="mt">${hd}</div>${intro}<div class="mr"><span class="mu">Preparando tu misión…</span></div></section>`; }
+  const prog = Math.min(m.meta, codeProg(m)), ok = prog >= m.meta;
+  const ir = m.tipo === 'ads' ? '<a class="btn sm" href="#misiones">Ver anuncios (abajo)</a>' : '<a class="btn sm" href="#juegos">Jugar ahora</a>';
+  return `<section class="card ms"><div class="mt">${hd}<span class="mu">${m.n}</span></div>${intro}<p><b>${m.t}</b></p><div class="mt"><span class="mu">${Math.floor(prog)}/${m.meta} ${m.u}</span></div><div class="jbar"><div style="transform:scaleX(${prog / m.meta})"></div></div><div class="mr">${ok ? `<span class="ok">${ic('check', 14)} Misión completa</span><span class="mu">Escribe <b>.code tu_número</b> en el bot.</span>` : ir}</div></section>`;
 }

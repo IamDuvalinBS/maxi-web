@@ -139,6 +139,10 @@ const JG = {
   pvz: { n: 'Plants vs Zombies Hybrids', ic: 'flower', d: 'Juego patrocinado de Playgama.', f: embedGame('pvz', PG + 'game/plants-vs-zombies-hybrids?clid=' + CLID, 'Plants vs Zombies Hybrids'), bot: 1, ext: 1 },
   deadly: { n: 'Deadly Descent', ic: 'skull', d: 'Juego patrocinado de Playgama.', f: embedGame('deadly', 'https://deadlydescent.net/export?clid=' + CLID, 'Deadly Descent'), bot: 1, ext: 1 },
   geometry: { n: 'Geometry Vibes 3D', ic: 'diamond', d: 'Juego patrocinado de Playgama.', f: embedGame('geometry', PG + 'game/geometry-vibes-3d?clid=' + CLID, 'Geometry Vibes 3D'), bot: 1, ext: 1 },
+  baby: { n: 'Baby Brainrots', ic: 'sparkle', d: 'Juego patrocinado de Playgama.', f: embedGame('baby', PG + 'game/baby-brainrots-multiplayer-with-friends?clid=' + CLID, 'Baby Brainrots'), bot: 1, ext: 1 },
+  aquapark: { n: 'Build an Aquapark', ic: 'bolt', d: 'Juego patrocinado de Playgama.', f: embedGame('aquapark', PG + 'game/build-an-aquapark?clid=' + CLID, 'Build an Aquapark'), bot: 1, ext: 1 },
+  cutmaster: { n: 'Obby Cut Master', ic: 'grid', d: 'Juego patrocinado de Playgama.', f: embedGame('cutmaster', PG + 'game/obby-cut-master?clid=' + CLID, 'Obby Cut Master'), bot: 1, ext: 1 },
+  robby: { n: 'Robby Double Jump', ic: 'star', d: 'Juego patrocinado de Playgama.', f: embedGame('robby', PG + 'game/robby-double-jump-for-brainrots?clid=' + CLID, 'Robby Double Jump'), bot: 1, ext: 1 },
   simon: { n: 'Simón', ic: 'grid', d: 'Memoriza y repite la secuencia de colores.', f: simon },
   tap: { n: 'Tap Veloz', ic: 'bolt', d: 'Toca lo más rápido que puedas en 10 segundos.', f: tapVeloz }
 };
