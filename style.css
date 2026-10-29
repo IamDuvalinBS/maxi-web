@@ -22,7 +22,7 @@ h1,h2,h3,.ti,.tt,.pn2{font-family:var(--fd);letter-spacing:-.01em}
 .vf{width:1.1em;height:1.1em;vertical-align:-.2em;display:inline-block}
 
 /* ===== Cabecera y menú ===== */
-header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:10px 16px;background:color-mix(in srgb,var(--bg) 90%,transparent);border-bottom:2px solid transparent;border-image:var(--rb) 1}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--bg);border-bottom:2px solid transparent;border-image:var(--rb) 1}
 header b,.sh b{font-family:var(--fd);font-size:1.05rem;font-weight:800}header .sp{flex:1}
 .nm{background:linear-gradient(90deg,var(--pk),var(--or));-webkit-background-clip:text;background-clip:text;color:transparent}
 .sf{background:linear-gradient(90deg,var(--cy),var(--li));-webkit-background-clip:text;background-clip:text;color:transparent}
