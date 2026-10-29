@@ -1,5 +1,5 @@
-// Anuncios solo cuando el usuario los pide (Adsterra). Cada anuncio completo suma 1 en la cuenta.
-const ADS = { src: 'https://afders.org/1/b41c3433668ea656bd302ab677eb0a46', link: 'https://asiafilm.org/4/746c263a78c3d8905dbd8eb2d3143b16', espera: 8 };
+// Anuncios solo cuando el usuario los pide (Monetag, zona 12149415). Cada anuncio completo suma 1 en la cuenta.
+const ADS = { src: 'https://nap5k.com/tag.min.js', zone: '12149415', link: '', espera: 8 };
 let adBusy = false;
 const anunciosView = () => { adBusy = false; return `<section class="card"><div class="ti">${ic('tv', 22)}<span>Ver anuncios</span></div><p class="mu">Cada anuncio completo suma 1 y desbloquea banners. Llevas <b id="adn">${stats().ads}</b>.</p><button class="btn" id="adb" data-a="ad">${ic('play', 16)}Ver anuncio</button><div id="adf"></div></section>`; };
 function adReset(msg) {
@@ -29,7 +29,7 @@ MODS.push(async a => {
   btn.textContent = 'Toca el botón del recuadro…';
   const f = document.createElement('iframe'); let cargo = false;
   f.className = 'adfr'; f.setAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox');
-  f.srcdoc = `<body style="margin:0;height:100vh;display:grid;place-items:center;background:#12151c;font-family:sans-serif"><button id="b" style="padding:14px 22px;border:0;border-radius:12px;background:#22d3ee;font-weight:700;font-size:16px">Ver anuncio</button><script>document.getElementById('b').onclick=function(){parent.postMessage({ad:1},'*')}<\/script><script data-cfasync="false" src="${ADS.src}" onload="parent.postMessage({ad:'ok'},'*')" onerror="parent.postMessage({ad:'err'},'*')"><\/script></body>`;
+  f.srcdoc = `<body style="margin:0;height:100vh;display:grid;place-items:center;background:#12151c;font-family:sans-serif"><button id="b" style="padding:14px 22px;border:0;border-radius:12px;background:#22d3ee;font-weight:700;font-size:16px">Ver anuncio</button><script>document.getElementById('b').onclick=function(){parent.postMessage({ad:1},'*')}<\/script><script data-cfasync="false" data-zone="${ADS.zone}" src="${ADS.src}" onload="parent.postMessage({ad:'ok'},'*')" onerror="parent.postMessage({ad:'err'},'*')"><\/script></body>`;
   $('#adf').innerHTML = ''; $('#adf').appendChild(f);
   const on = e => {
     if (e.source !== f.contentWindow || !e.data) return;
