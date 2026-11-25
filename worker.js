@@ -115,7 +115,7 @@ async function ia(request, env) {
     const r = await env.AI.run(MODELO, { messages: [{ role: "system", content: SISTEMA }, ...msgs], max_tokens: 700, temperature: 0.7 });
     const texto = String((r && (r.response || r.result)) || "").trim();
     return texto ? json({ ok: true, texto: texto.slice(0, 4000) }) : json({ ok: false, e: "vacio" }, 502);
-  } catch (_) { return json({ ok: false, e: "ia" }, 503); }
+  } catch (err) { return json({ ok: false, e: "ia", d: String((err && err.message) || err).slice(0, 160) }, 503); }
 }
 
 export default {
