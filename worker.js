@@ -1,4 +1,4 @@
-// 1) Reenvía las rutas de login de Firebase (/__/auth y /__/firebase) a firebaseapp.com
+   // 1) Reenvía las rutas de login de Firebase (/__/auth y /__/firebase) a firebaseapp.com
 //    para que el login con Google funcione en este dominio.
 // 2) /api/previa?u=<enlace>: arma la previa de un enlace (título, descripción, imagen) para los chats.
 //    El resto lo sirve la página normal.
@@ -86,14 +86,11 @@ async function previa(request, ctx) {
 // cual a otro Worker.
 //
 //   tipo "cf"  -> Cloudflare Workers AI (binding env.AI, sin key)
-//   tipo "ddg" -> DuckDuckGo AI Chat (sin cuenta ni key, token temporal al vuelo;
-//                  sirve gpt-4o-mini y Claude Haiku: lo más cercano a ChatGPT)
+//   tipo "ddg" -> DuckDuckGo AI Chat (sin cuenta ni key, token temporal al vuelo)
 //   tipo "oa"  -> cualquier endpoint compatible con OpenAI (POST, sin key)
 //
 // Con llaves opcionales (wrangler secret put ...) se sube la calidad sin tocar código:
-//   OPENAI_KEY    -> gpt-5-nano y gpt-5, van los primeros
-//   POLLEN_KEY    -> openai/gpt-5.4-nano en Pollinations
-//   OPENROUTER_KEY-> openai/gpt-5-nano vía OpenRouter
+//   OPENAI_KEY / POLLEN_KEY / OPENROUTER_KEY -> gpt-5-nano y similares, van primeros.
 const PROVEEDORES = [
   // 1) Calidad primero: los mejores modelos del catálogo de Workers AI.
   { id: "cf-llama4-scout", tipo: "cf", modelo: "@cf/meta/llama-4-scout-17b-16e-instruct" },
@@ -124,6 +121,7 @@ const sistema = (extra = "") =>
   "no la menciones por tu cuenta ni preguntes si quieres jugar. " +
   "Si no estás seguro de un dato, dilo con honestidad y da lo que sí sepas, sin inventar. " +
   "Normalmente no tienes internet; cuando te llegue contexto web, ese contexto manda sobre tu memoria y lo citas con [n]. " +
+  "Si te dan una RESPUESTA ENCONTRADA, cópiala literal y en una o dos frases: no la sustituyas por lo que recuerdes. " +
   "Puedes usar *negrita* y listas con guiones." + (extra ? "\n\n" + extra : "");
 
 const sacaTexto = r => String(
@@ -193,7 +191,7 @@ async function ddg(p, msgs, signal, intento = 0) {
 }
 
 
-// ── Caché de respuestas e investigaciones ────────────────────────────────────
+// ── Caché de respuestas, respuestas directas e investigaciones ───────────────
 const memo = new Map(), TTL = 10 * 60e3;
 const clave = msgs => msgs.slice(-4).map(m => m.role[0] + ":" + m.content).join("|").slice(0, 4000);
 function delMemo(k) {
@@ -208,7 +206,7 @@ function alMemo(k, x) {
 }
 
 
-// ── Investigación web sin llaves: SERP múltiple, descarga y extracción ────────
+// ── Investigación web sin llaves ─────────────────────────────────────────────
 const soloTexto = h => decode(String(h || "")
   .replace(/<(script|style|noscript|svg|iframe|form|nav|header|footer|aside|template)[\s\S]*?<\/\1>/gi, " ")
   .replace(/<!--[\s\S]*?-->/g, " ")
@@ -298,6 +296,71 @@ async function enGoogle(q, signal) {
   return out.slice(0, 6);
 }
 
+// ── Respuesta literal de Google ──────────────────────────────────────────────
+// Bloques donde Google pone la respuesta destacada o la ficha de conocimiento.
+const CAJAS = [
+  /data-attrid="wa:\/description"[^>]*>([\s\S]*?)<\/(?:div|span)>/i,
+  /<div[^>]*class="[^"]*\b(?:IZ6rdc|hgKElc|kno-rdesc|zCubwf)\b[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+  /<span[^>]*data-attrid="wa:\/description"[^>]*>([\s\S]*?)<\/span>/i,
+  /<blockquote[^>]*>([\s\S]*?)<\/blockquote>/i
+];
+
+async function googleRespuesta(q, signal) {
+  const h = await baja("https://www.google.com/search?hl=es&num=10&q=" + encodeURIComponent(q), signal, 220000);
+  const trozos = [];
+  for (const pat of CAJAS) {
+    const m = h.match(pat);
+    if (!m) continue;
+    const t = soloTexto(m[1]);
+    if (t.length > 40 && !trozos.includes(t)) trozos.push(t);
+  }
+  return trozos.join(" ").slice(0, 900);
+}
+
+async function ddgRespuesta(q, signal) {
+  const r = await fetch("https://api.duckduckgo.com/?format=json&no_html=1&skip_disambig=1&q=" + encodeURIComponent(q),
+    { signal, headers: { "user-agent": UA, accept: "application/json" } });
+  if (!r.ok) return "";
+  const j = await r.json();
+  return String(j?.AbstractText || j?.Answer || j?.Definition || "").slice(0, 900);
+}
+
+async function wikiRespuesta(q, signal) {
+  const r = await fetch("https://es.wikipedia.org/w/api.php?action=query&format=json&origin=*&srlimit=1&list=search&srsearch=" + encodeURIComponent(q),
+    { signal, headers: { "user-agent": UA, accept: "application/json" } });
+  if (!r.ok) return "";
+  const j = await r.json();
+  const titulo = j?.query?.search?.[0]?.title;
+  if (!titulo) return "";
+  const s = await fetch("https://es.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(titulo.replace(/ /g, "_")),
+    { signal, headers: { "user-agent": UA, accept: "application/json" } });
+  if (!s.ok) return "";
+  const sj = await s.json();
+  return String(sj?.extract || "").slice(0, 900);
+}
+
+// Devuelve la primera respuesta literal que aparezca, con su procedencia.
+async function respuestaDirecta(q, signal) {
+  const k = "d:" + normal(q).slice(0, 140);
+  const guardada = delMemo(k);
+  if (guardada !== null) return guardada;
+
+  const intentos = [
+    ["Google", googleRespuesta],
+    ["DuckDuckGo", ddgRespuesta],
+    ["Wikipedia", wikiRespuesta]
+  ];
+  let out = null;
+  for (const [de, fn] of intentos) {
+    try {
+      const t = await fn(q, signal);
+      if (t && t.length > 40) { out = { texto: t, de }; break; }
+    } catch (_) {}
+  }
+  alMemo(k, out);
+  return out;
+}
+
 // ── Extracción del cuerpo real ──
 const RUIDO = /^(aceptar|usamos cookies|este sitio|suscr[ií]bete|newsletter|comparte|publicidad|leer m[aá]s|ver m[aá]s|pol[ií]tica de|todos los derechos|©)/i;
 
@@ -309,7 +372,6 @@ function extrae(html) {
   const limpio = h.replace(/<(script|style|noscript|svg|iframe|form|nav|header|footer|aside|template)[\s\S]*?<\/\1>/gi, " ")
                    .replace(/<!--[\s\S]*?-->/g, " ");
 
-  // Si hay <article>/<main> con volumen, esa es la zona buena; si no, todo el documento.
   let zona = (limpio.match(/<(article|main)\b[^>]*>([\s\S]*?)<\/\1>/i) || [])[2] || "";
   if (soloTexto(zona).length < 500) zona = limpio;
 
@@ -359,7 +421,7 @@ const puntua = (r, ts) => {
 async function investigar(q, nivel = 2) {
   const k = "i" + nivel + ":" + normal(q).slice(0, 140);
   const guardado = delMemo(k);
-  if (guardado) return guardado;
+  if (guardado !== null) return guardado;
 
   const ts = palabras(q);
   if (!ts.length) return [];
@@ -492,19 +554,28 @@ async function ia(request, env) {
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") return json({ ok: false }, 400);
 
   const pregunta = msgs[msgs.length - 1].content;
-  const pideDatos = body.buscar === true ||
-    /\b(hoy|ayer|ahora|actual|actualmente|últim[oa]s?|noticias?|precio|cu[aá]nto (cuesta|sale|vale)|qui[eé]n (gan[oó]|es|fue)|d[oó]nde (est[aá]|queda)|clima|resultado|cotizaci[oó]n|estreno|sali[oó]|2026)\b/i.test(pregunta);
+  const quiere = body.buscar === true || (body.buscar !== false && !CHARLA.test(pregunta.trim()));
+  const nivel = Math.min(3, Math.max(1, Number(body.profundidad) || (FRESCO.test(pregunta) ? 2 : 1)));
 
-  let fuentes = [], extra = "";
-  if (pideDatos) {
-    const nivel = Math.min(3, Math.max(1, Number(body.profundidad) || 2));
-    try {
-      fuentes = await investigar(pregunta.slice(0, 200), nivel);
-      if (fuentes.length) extra = "Contexto web recuperado ahora mismo. Para datos actuales usa SOLO esto y cita con [n]; si no alcanza, dilo y no inventes:\n\n" + contexto(fuentes);
-    } catch (_) {}
+  let fuentes = [], extra = "", directa = null;
+  if (quiere) {
+    const q = consulta(pregunta);
+    const ac = new AbortController(), to = setTimeout(() => ac.abort(), 12000);
+    [directa, fuentes] = await Promise.all([
+      respuestaDirecta(q, ac.signal).catch(() => null),
+      investigar(q, nivel).catch(() => [])
+    ]);
+    clearTimeout(to);
+
+    if (directa) {
+      extra = "RESPUESTA ENCONTRADA en " + directa.de + " (cópiala literal, en una o dos frases):\n\n" + directa.texto +
+        (fuentes.length ? "\n\nFuentes de apoyo para citar con [n]:\n\n" + contexto(fuentes) : "");
+    } else if (fuentes.length) {
+      extra = "Contexto web recuperado ahora mismo. Para datos actuales usa SOLO esto y cita con [n]; si no alcanza, dilo y no inventes:\n\n" + contexto(fuentes);
+    }
   }
 
-  const k = clave(msgs) + (pideDatos ? "#w" : "");
+  const k = clave(msgs) + (quiere ? "#w" + nivel : "");
   const guardada = delMemo(k);
   if (guardada) return json({ ok: true, texto: guardada, cache: true });
 
@@ -535,8 +606,23 @@ async function ia(request, env) {
       ultimo = p.id + ": " + String((err && err.message) || err);
     }
   }
+
+  // Si ningún modelo contesta pero hay respuesta literal, se sirve tal cual.
+  if (directa) return json({ ok: true, texto: directa.texto, fuentes: fuentes.map(f => ({ t: f.t, u: f.u })), directo: true });
   return json({ ok: false, e: "ia", d: ultimo.slice(0, 200) }, 503);
 }
+
+// Chit-chat que no merece búsqueda
+const CHARLA = /^(hola|buenas|buenos d[ií]as|buenas (tardes|noches)|hey|ey|qu[eé] tal|c[oó]mo est[aá]s|gracias|ok|vale|dale|s[ií]|no|jaja+|xd|qui[eé]n eres|qu[eé] eres|qu[eé] puedes hacer|ayuda|c[oó]mo funciona)[\s!?.]*$/i;
+
+// Preguntas que piden dato fresco: suben la profundidad
+const FRESCO = /\b(hoy|ayer|ahora|actual|actualmente|últim[oa]s?|noticias?|precio|cu[aá]nto (cuesta|sale|vale)|qu[eé] (es|son|significa|significan|era)|qui[eé]n (es|fue|gan[oó])|qu[ií]enes|d[oó]nde (est[aá]|queda)|c[oó]mo (se|hago|funciona)|cu[aá]l (es|fue)|clima|resultado|cotizaci[oó]n|estreno|sali[oó]|meme|jerga|slang|tendencia|viral|moda|se dice|202\d)\b/i;
+
+// Deja la consulta limpia para el buscador: sin "oye bro" ni "qué es".
+const consulta = q => String(q)
+  .replace(/^(oye|ey|bro|hermano|pues|bueno|a ver)[\s,]+/gi, "")
+  .replace(/^(y\s+)?qu[eé]\s+(es|son|significa)\s+/i, "")
+  .replace(/\s+/g, " ").trim().slice(0, 200) || String(q).slice(0, 200);
 
 export default {
   async fetch(request, env, ctx) {
