@@ -3,6 +3,10 @@
 // 2) /api/previa?u=<enlace>: arma la previa de un enlace (título, descripción, imagen) para los chats.
 //    El resto lo sirve la página normal.
 const FIREBASE = "https://maxi-bot-b7dfc.firebaseapp.com";
+const PROYECTO = "maxi-bot-b7dfc";
+// Modelo de IA gratis de Cloudflare Workers AI (cámbialo por "@cf/meta/llama-3.3-70b-instruct-fp8-fast" para respuestas mejores, gasta más del cupo diario)
+const MODELO = "@cf/meta/llama-3.1-8b-instruct";
+const SISTEMA = "Eres Mambo IA, la asistente de la página Mambo Bot (juegos, misiones, pases, canjes y chats de un bot de WhatsApp). Respondes siempre en español, con un tono amable y cercano, claro y breve (máximo unos 6 párrafos cortos). Si no sabes algo, lo dices. No inventes datos de la cuenta del usuario ni prometas premios. Puedes usar *negrita* y listas con guiones.";
 
 const json = (o, s = 200, cache = false) => new Response(JSON.stringify(o), {
   status: s,
@@ -72,6 +76,48 @@ async function previa(request, ctx) {
   return res;
 }
 
+
+// ── IA: solo para personas con sesión iniciada en la página ──
+let JWKS = null, JWKS_T = 0;
+const jwks = async () => {
+  if (JWKS && Date.now() - JWKS_T < 3600e3) return JWKS;
+  const r = await fetch("https://www.googleapis.com/robot/v1/metadata/jwk/securetoken@system.gserviceaccount.com");
+  JWKS = (await r.json()).keys; JWKS_T = Date.now(); return JWKS;
+};
+const b64u = s => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(s.length / 4) * 4, "=")), c => c.charCodeAt(0));
+export async function uidDe(request, jw = jwks) {
+  const tk = (request.headers.get("authorization") || "").replace(/^Bearer /, ""), p = tk.split(".");
+  if (p.length !== 3) return null;
+  try {
+    const h = JSON.parse(new TextDecoder().decode(b64u(p[0]))), d = JSON.parse(new TextDecoder().decode(b64u(p[1])));
+    if (h.alg !== "RS256" || d.aud !== PROYECTO || d.iss !== "https://securetoken.google.com/" + PROYECTO || !d.sub || !(d.exp * 1000 > Date.now())) return null;
+    const k = (await jw()).find(x => x.kid === h.kid); if (!k) return null;
+    const key = await crypto.subtle.importKey("jwk", k, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+    return (await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64u(p[2]), new TextEncoder().encode(p[0] + "." + p[1]))) ? d.sub : null;
+  } catch (_) { return null; }
+}
+const uso = new Map();                                                          // límite por persona: 12 mensajes por minuto
+const limite = uid => { const n = Date.now(), l = (uso.get(uid) || []).filter(t => n - t < 60000); l.push(n); uso.set(uid, l); if (uso.size > 5000) uso.clear(); return l.length <= 12; };
+
+async function ia(request, env) {
+  const site = request.headers.get("sec-fetch-site");
+  if (site && site !== "same-origin") return json({ ok: false }, 403);
+  const uid = await uidDe(request);
+  if (!uid) return json({ ok: false, e: "sesion" }, 401);
+  if (!limite(uid)) return json({ ok: false, e: "rapido" }, 429);
+  if (!env.AI) return json({ ok: false, e: "sin-ia" }, 503);
+  let body; try { body = await request.json(); } catch (_) { return json({ ok: false }, 400); }
+  const msgs = (Array.isArray(body.messages) ? body.messages : []).slice(-12)
+    .filter(m => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
+    .map(m => ({ role: m.role, content: m.content.slice(0, 2000) }));
+  if (!msgs.length || msgs[msgs.length - 1].role !== "user") return json({ ok: false }, 400);
+  try {
+    const r = await env.AI.run(MODELO, { messages: [{ role: "system", content: SISTEMA }, ...msgs], max_tokens: 700, temperature: 0.7 });
+    const texto = String((r && (r.response || r.result)) || "").trim();
+    return texto ? json({ ok: true, texto: texto.slice(0, 4000) }) : json({ ok: false, e: "vacio" }, 502);
+  } catch (_) { return json({ ok: false, e: "ia" }, 503); }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -80,6 +126,7 @@ export default {
       return fetch(new Request(destino, request), { redirect: "manual" });
     }
     if (url.pathname === "/api/previa" && request.method === "GET") return previa(request, ctx);
+    if (url.pathname === "/api/ia" && request.method === "POST") return ia(request, env);
     return env.ASSETS.fetch(request);
   }
 };

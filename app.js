@@ -4,7 +4,7 @@ const NAV = [['inicio','home','Inicio','Menú'],['juegos','game','Juegos','Menú
 let fb = null, db = null, user = null, perfil = null, ready = false, pendingName = '', authMode = 'in';
 try { if (window.firebase && C.firebase && C.firebase.apiKey) { firebase.initializeApp(C.firebase); fb = firebase.auth(); db = firebase.firestore(); try { db.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch (_) {} } } catch (e) { fb = null; db = null; }
 
-const page = () => { const h = location.hash.slice(1); return h.startsWith('chat/') ? 'chat' : h.startsWith('juego/') ? 'juego' : h.startsWith('noticia/') ? 'noticia' : h.startsWith('u/') ? 'u' : NAV.some(n => n[0] === h) ? h : 'inicio'; };
+const page = () => { const h = location.hash.slice(1); return h.startsWith('chat/') ? 'chat' : h.startsWith('juego/') ? 'juego' : h.startsWith('noticia/') ? 'noticia' : h.startsWith('u/') ? 'u' : h === 'ia' ? 'ia' : h === 'canal' ? 'canal' : NAV.some(n => n[0] === h) ? h : 'inicio'; };
 const nombre = () => (perfil && perfil.nombre) || (user && (user.displayName || (user.email || '').split('@')[0])) || '';
 const foto = () => (perfil && perfil.avatar) || (user && user.photoURL) || '';
 const avatar = px => `<span class="av${marcoCls()}" style="width:${px}px;height:${px}px;font-size:${px/2.5}px">${foto() ? `<img src="${esc(foto())}" alt="" referrerpolicy="no-referrer">` : inicial(nombre())}</span>`;
@@ -79,6 +79,8 @@ const PAGES = {
   },
   misiones: () => misionesView(),
   chats: () => chatsView(),
+  ia: () => iaView(),
+  canal: () => canalView(),
   chat: () => chatView(),
   juegos: () => juegosView(),
   juego: () => juegoView(),
