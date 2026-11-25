@@ -180,7 +180,7 @@ async function iaEnvia(texto) {
     clearTimeout(to);
     const d = await r.json().catch(() => ({}));
     if (r.ok && d.ok && d.texto) L.push({ r: 'a', tx: d.texto, t: Date.now() });
-    else L.push({ r: 'a', e: 1, t: Date.now(), tx: r.status === 429 ? 'Vas muy rápido. Espera unos segundos y vuelve a intentar.' : r.status === 401 ? 'Tu sesión venció. Sal y vuelve a entrar.' : r.status === 404 ? 'La IA solo funciona en la página de Cloudflare (mamboweb), no en esta dirección.' : 'Ahora mismo no puedo responder. Intenta de nuevo en un momento.' });
+    else L.push({ r: 'a', e: 1, t: Date.now(), tx: r.status === 429 ? 'Vas muy rápido. Espera unos segundos y vuelve a intentar.' : r.status === 401 ? 'Tu sesión venció. Sal y vuelve a entrar.' : r.status === 404 ? 'La IA solo funciona en la página de Cloudflare (mamboweb), no en esta dirección.' : 'Ahora mismo no puedo responder. Intenta de nuevo en un momento. (' + (d.e || r.status) + (d.d ? ': ' + d.d : '') + ')' });
   } catch (_) { L.push({ r: 'a', e: 1, t: Date.now(), tx: 'No pude conectarme. Revisa tu internet e intenta otra vez.' }); }
   iaBusy = false; iaSave(); iaPinta();
 }
