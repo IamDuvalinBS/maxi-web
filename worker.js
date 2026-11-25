@@ -85,28 +85,37 @@ async function previa(request, ctx) {
 // atado a un proveedor concreto, así que el bloque entero se puede copiar tal
 // cual a otro Worker.
 //
-//   tipo "cf"  -> Cloudflare Workers AI (binding env.AI, sin key, cuenta gratis)
+//   tipo "cf"  -> Cloudflare Workers AI (binding env.AI, sin key)
+//   tipo "ddg" -> DuckDuckGo AI Chat (sin cuenta ni key, token temporal al vuelo;
+//                  sirve gpt-4o-mini y Claude Haiku: lo más cercano a ChatGPT)
 //   tipo "oa"  -> cualquier endpoint compatible con OpenAI (POST, sin key)
 //
-// Si algún día pones una key de OpenRouter en el secreto OPENROUTER_KEY, se
-// añade sola delante con un modelo gratis. Sin key no pasa nada.
+// Con llaves opcionales (wrangler secret put ...) se sube la calidad sin tocar código:
+//   OPENAI_KEY    -> gpt-5-nano y gpt-5, van los primeros
+//   POLLEN_KEY    -> openai/gpt-5.4-nano en Pollinations
+//   OPENROUTER_KEY-> openai/gpt-5-nano vía OpenRouter
 const PROVEEDORES = [
+  // 1) Calidad primero: los mejores modelos del catálogo de Workers AI.
   { id: "cf-llama4-scout", tipo: "cf", modelo: "@cf/meta/llama-4-scout-17b-16e-instruct" },
   { id: "cf-gpt-oss-120b", tipo: "cf", modelo: "@cf/openai/gpt-oss-120b" },
   { id: "cf-llama33-70b", tipo: "cf", modelo: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" },
   { id: "cf-qwen3-30b", tipo: "cf", modelo: "@cf/qwen/qwen3-30b-a3b-fp8" },
   { id: "cf-mistral-small", tipo: "cf", modelo: "@cf/mistralai/mistral-small-3.1-24b-instruct" },
-  // Pollinations: sin cuenta y sin key, modelos GPT-class. El parámetro
-  // "referrer" te sube el límite gratuito, por eso se manda el origin.
+  // 2) GPT de verdad, sin cuenta ni key.
+  { id: "ddg-gpt4o-mini", tipo: "ddg", modelo: "gpt-4o-mini" },
+  { id: "ddg-claude-haiku", tipo: "ddg", modelo: "claude-3-haiku-20240307" },
+  { id: "ddg-llama33", tipo: "ddg", modelo: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
+  // 3) Pollinations: sin cuenta y sin key. El parámetro "referrer" sube el límite.
   { id: "pollinations-gpt", tipo: "oa", url: "https://text.pollinations.ai/openai", modelo: "openai", referrer: true },
   { id: "pollinations-gpt-large", tipo: "oa", url: "https://text.pollinations.ai/openai", modelo: "openai-large", referrer: true },
-  // Último recurso: endpoint abierto compatible con OpenAI.
+  // 4) Último recurso: endpoint abierto compatible con OpenAI.
   { id: "hackclub", tipo: "oa", url: "https://ai.hackclub.com/chat/completions" }
 ];
 
 // Catálogo de Workers AI: https://developers.cloudflare.com/workers-ai/models/
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
-const sistema = () =>
+const sistema = (extra = "") =>
   "Eres Mambo IA, un asistente de inteligencia artificial de uso general, como Meta IA o ChatGPT, dentro de la página Mambo Bot. " +
   "Respondes preguntas de cualquier tema (cultura general, música, juegos, escuela, tecnología, consejos, chistes, redacción, etc.) " +
   "siempre en español, con un tono amable y cercano, claro y breve (máximo unos 6 párrafos cortos). " +
@@ -114,7 +123,8 @@ const sistema = () =>
   "Solo mencionas la página (juegos, misiones, pases, canjes, chats y el bot de WhatsApp) cuando te pregunten por ella; " +
   "no la menciones por tu cuenta ni preguntes si quieres jugar. " +
   "Si no estás seguro de un dato, dilo con honestidad y da lo que sí sepas, sin inventar. " +
-  "No tienes acceso a la cuenta del usuario ni a internet. Puedes usar *negrita* y listas con guiones.";
+  "Normalmente no tienes internet; cuando te llegue contexto web, ese contexto manda sobre tu memoria y lo citas con [n]. " +
+  "Puedes usar *negrita* y listas con guiones." + (extra ? "\n\n" + extra : "");
 
 const sacaTexto = r => String(
   (r && (r.response || r.result ||
@@ -122,14 +132,297 @@ const sacaTexto = r => String(
       (r.choices[0].message.content || r.choices[0].message.reasoning_content)))) || ""
 ).trim();
 
+// ── DuckDuckGo AI Chat: token temporal (x-vqd) y lectura del stream SSE ──
+let VQD = null, VQD_T = 0;
+async function vqd(signal, forzar) {
+  if (!forzar && VQD && Date.now() - VQD_T < 4 * 60e3) return VQD;
+  const r = await fetch("https://duckduckgo.com/duckchat/v1/status", {
+    signal,
+    headers: { "x-vqd-accept": "1", "user-agent": UA, accept: "*/*", "accept-language": "es-ES,es;q=0.9,en;q=0.8" }
+  });
+  if (!r.ok) throw new Error("vqd " + r.status);
+  const v = { t: r.headers.get("x-vqd-4"), h: r.headers.get("x-vqd-hash-1") };
+  if (!v.t) throw new Error("sin vqd");
+  VQD = v; VQD_T = Date.now();
+  return v;
+}
+
+async function ddg(p, msgs, signal, intento = 0) {
+  const v = await vqd(signal, intento > 0);
+  // DDG no traga bien el rol "system": se pliega en el primer mensaje de usuario.
+  const limpios = msgs.map(m => ({ ...m }));
+  limpios[0] = { role: "user", content: sistema() + "\n\n" + limpios[0].content };
+
+  const r = await fetch("https://duckduckgo.com/duckchat/v1/chat", {
+    method: "POST",
+    signal,
+    headers: {
+      "content-type": "application/json",
+      "x-vqd-4": v.t,
+      ...(v.h ? { "x-vqd-hash-1": v.h } : {}),
+      "x-fe-version": "serp_20250325_110000_ET",
+      "user-agent": UA,
+      origin: "https://duckduckgo.com",
+      referer: "https://duckduckgo.com/",
+      accept: "text/event-stream",
+      "accept-language": "es-ES,es;q=0.9,en;q=0.8"
+    },
+    body: JSON.stringify({ model: p.modelo, messages: limpios })
+  });
+
+  if ((r.status === 403 || r.status === 418) && intento === 0) return ddg(p, msgs, signal, 1);  // token caducado: uno nuevo
+  if (!r.ok || !r.body) throw new Error("HTTP " + r.status);
+
+  const rd = r.body.getReader(), td = new TextDecoder("utf-8", { fatal: false });
+  let buf = "", out = "";
+  while (true) {
+    const { done, value } = await rd.read();
+    if (done) break;
+    buf += td.decode(value, { stream: true });
+    const lineas = buf.split("\n"); buf = lineas.pop() || "";
+    for (const ln of lineas) {
+      const l = ln.trim();
+      if (!l.startsWith("data:")) continue;
+      const d = l.slice(5).trim();
+      if (!d || d === "[DONE]") continue;
+      try { const j = JSON.parse(d); if (j.message) out += j.message; } catch (_) {}
+    }
+  }
+  try { rd.cancel(); } catch (_) {}
+  return out.trim();
+}
+
+
+// ── Caché de respuestas e investigaciones ────────────────────────────────────
+const memo = new Map(), TTL = 10 * 60e3;
+const clave = msgs => msgs.slice(-4).map(m => m.role[0] + ":" + m.content).join("|").slice(0, 4000);
+function delMemo(k) {
+  const v = memo.get(k);
+  if (v && Date.now() - v.t < TTL) return v.x;
+  if (v) memo.delete(k);
+  return null;
+}
+function alMemo(k, x) {
+  memo.set(k, { x, t: Date.now() });
+  if (memo.size > 200) memo.delete(memo.keys().next().value);
+}
+
+
+// ── Investigación web sin llaves: SERP múltiple, descarga y extracción ────────
+const soloTexto = h => decode(String(h || "")
+  .replace(/<(script|style|noscript|svg|iframe|form|nav|header|footer|aside|template)[\s\S]*?<\/\1>/gi, " ")
+  .replace(/<!--[\s\S]*?-->/g, " ")
+  .replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+
+async function baja(url, signal, max = 200000) {
+  const r = await fetch(url, {
+    signal, redirect: "follow",
+    headers: { "user-agent": UA, accept: "text/html,application/xhtml+xml", "accept-language": "es-ES,es;q=0.9,en;q=0.8" }
+  });
+  if (!r.ok || !r.body) throw new Error("HTTP " + r.status);
+  if (!/html|text/i.test(r.headers.get("content-type") || "")) throw new Error("no-html");
+  const rd = r.body.getReader(), td = new TextDecoder("utf-8", { fatal: false });
+  let s = "", n = 0;
+  while (n < max) { const { done, value } = await rd.read(); if (done) break; n += value.length; s += td.decode(value, { stream: true }); }
+  try { rd.cancel(); } catch (_) {}
+  return s;
+}
+
+async function mapa(items, limite, fn) {
+  const cola = [...items];
+  await Promise.all(Array.from({ length: Math.min(limite, cola.length) }, async () => {
+    while (cola.length) await fn(cola.shift());
+  }));
+}
+
+const STOP = new Set("de la el los las un una unos unas que con por para en del al y o es son fue como qué quien quién cual cuál cuando cuándo donde dónde cuanto cuánto más muy sin sobre entre hasta desde este esta esto ese esa eso su sus mis tus".split(" "));
+const palabras = q => [...new Set(String(q).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").match(/[a-z0-9]{3,}/g) || [])].filter(w => !STOP.has(w)).slice(0, 8);
+const normal = s => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+// ── Motores ──
+const anclas = (html, patron) => {
+  const out = [];
+  for (const m of html.matchAll(/<a\s+([^>]+)>([\s\S]*?)<\/a>/gi)) {
+    if (!new RegExp(patron, "i").test(m[1])) continue;
+    const u = (m[1].match(/href\s*=\s*["']([^"']+)["']/i) || [])[1] || "";
+    const t = soloTexto(m[2]);
+    if (/^https?:/i.test(u) && t.length > 12) out.push({ u, t: t.slice(0, 110) });
+  }
+  return out;
+};
+
+async function enWikipedia(q, signal) {
+  const r = await fetch("https://es.wikipedia.org/w/api.php?action=query&format=json&origin=*&srlimit=3&list=search&srsearch=" + encodeURIComponent(q),
+    { signal, headers: { "user-agent": UA, accept: "application/json" } });
+  if (!r.ok) return [];
+  const j = await r.json();
+  return (j?.query?.search || []).map(x => ({
+    t: x.title,
+    u: "https://es.wikipedia.org/wiki/" + encodeURIComponent(x.title.replace(/ /g, "_")),
+    x: soloTexto(x.snippet).slice(0, 320)
+  }));
+}
+
+async function enDuckDuckGo(q, signal) {
+  const h = await baja("https://lite.duckduckgo.com/lite/?q=" + encodeURIComponent(q), signal, 150000);
+  const snips = [...h.matchAll(/<td[^>]*class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/gi)].map(m => soloTexto(m[1]));
+  return anclas(h, "result-link").map((l, i) => ({ ...l, x: (snips[i] || "").slice(0, 320) }));
+}
+
+async function enMojeek(q, signal) {
+  const h = await baja("https://www.mojeek.com/search?q=" + encodeURIComponent(q), signal, 180000);
+  const snips = [...h.matchAll(/<p[^>]*class=['"]s['"][^>]*>([\s\S]*?)<\/p>/gi)].map(m => soloTexto(m[1]));
+  return anclas(h, "class=['\"]ob").map((l, i) => ({ ...l, x: (snips[i] || "").slice(0, 320) }));
+}
+
+async function enBing(q, signal) {
+  const h = await baja("https://www.bing.com/search?setlang=es&q=" + encodeURIComponent(q), signal, 200000);
+  const out = [];
+  for (const m of h.matchAll(/<h2[^>]*>\s*<a\s+([^>]+)>([\s\S]*?)<\/a>/gi)) {
+    const u = (m[1].match(/href\s*=\s*["']([^"']+)["']/i) || [])[1] || "";
+    const t = soloTexto(m[2]);
+    if (/^https?:/i.test(u) && t) out.push({ u, t: t.slice(0, 110) });
+  }
+  return out.slice(0, 6);
+}
+
+async function enGoogle(q, signal) {
+  const h = await baja("https://www.google.com/search?hl=es&num=10&q=" + encodeURIComponent(q), signal, 200000);
+  const out = [];
+  for (const m of h.matchAll(/<a\s+([^>]+)>\s*<h3[^>]*>([\s\S]*?)<\/h3>/gi)) {
+    let u = (m[1].match(/href\s*=\s*["']([^"']+)["']/i) || [])[1] || "";
+    if (u.startsWith("/url?q=")) { try { u = new URL("https://www.google.com" + u).searchParams.get("q") || ""; } catch (_) { u = ""; } }
+    const t = soloTexto(m[2]);
+    if (/^https?:/i.test(u) && t) out.push({ u, t: t.slice(0, 110) });
+  }
+  return out.slice(0, 6);
+}
+
+// ── Extracción del cuerpo real ──
+const RUIDO = /^(aceptar|usamos cookies|este sitio|suscr[ií]bete|newsletter|comparte|publicidad|leer m[aá]s|ver m[aá]s|pol[ií]tica de|todos los derechos|©)/i;
+
+function extrae(html) {
+  const h = String(html || "");
+  const titulo = limpia((h.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] ||
+    (h.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']*)/i) || [])[1] || "", 120);
+
+  const limpio = h.replace(/<(script|style|noscript|svg|iframe|form|nav|header|footer|aside|template)[\s\S]*?<\/\1>/gi, " ")
+                   .replace(/<!--[\s\S]*?-->/g, " ");
+
+  // Si hay <article>/<main> con volumen, esa es la zona buena; si no, todo el documento.
+  let zona = (limpio.match(/<(article|main)\b[^>]*>([\s\S]*?)<\/\1>/i) || [])[2] || "";
+  if (soloTexto(zona).length < 500) zona = limpio;
+
+  const vistos = new Set(), lineas = [];
+  for (const m of zona.matchAll(/<(h2|h3|p|li|blockquote)\b[^>]*>([\s\S]*?)<\/\1>/gi)) {
+    const t = soloTexto(m[2]);
+    if (t.length < 40) continue;
+    if (t.length < 140 && RUIDO.test(t)) continue;
+    const kk = t.slice(0, 70).toLowerCase();
+    if (vistos.has(kk)) continue;
+    vistos.add(kk);
+    lineas.push(m[1].toLowerCase()[0] === "h" ? "## " + t : m[1].toLowerCase() === "li" ? "- " + t : t);
+  }
+  return { titulo, texto: lineas.join("\n").slice(0, 5000) };
+}
+
+function enlacesInternos(html, base, ts) {
+  let host; try { host = new URL(base).hostname; } catch (_) { return []; }
+  const out = [];
+  for (const m of String(html).matchAll(/<a\s+([^>]+)>([\s\S]*?)<\/a>/gi)) {
+    const href = (m[1].match(/href\s*=\s*["']([^"']+)["']/i) || [])[1];
+    if (!href) continue;
+    let u; try { u = new URL(decode(href), base); } catch (_) { continue; }
+    if (u.hostname !== host || /\.(jpg|jpeg|png|gif|svg|webp|pdf|zip|mp4|mp3)$/i.test(u.pathname)) continue;
+    const t = soloTexto(m[2]);
+    if (t.length < 14) continue;
+    const bajo = normal(t + " " + u.pathname);
+    if (!ts.some(w => bajo.includes(w))) continue;
+    out.push({ u: u.href, t: t.slice(0, 90) });
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+const puntua = (r, ts) => {
+  const t = normal(r.t + " " + (r.x || ""));
+  let s = 0;
+  for (const w of ts) if (t.includes(w)) s += 3;
+  if (/\.(edu|gov|gob)(\.|$)/.test(r.d)) s += 2;
+  if (/wikipedia\.org$/.test(r.d)) s += 1;
+  if (/(^|\.)(medium|quora|reddit|tiktok|pinterest|facebook)\./.test(r.d)) s -= 1;
+  s -= Math.max(0, r.t.length - 90) / 40;
+  return s;
+};
+
+// nivel: 1 = 2 páginas, 2 = 4 páginas, 3 = 6 páginas + un salto a enlaces internos
+async function investigar(q, nivel = 2) {
+  const k = "i" + nivel + ":" + normal(q).slice(0, 140);
+  const guardado = delMemo(k);
+  if (guardado) return guardado;
+
+  const ts = palabras(q);
+  if (!ts.length) return [];
+  const ac = new AbortController(), to = setTimeout(() => ac.abort(), 16000);
+
+  const crudos = [];
+  const lanzar = async fn => { try { crudos.push(...await fn(q, ac.signal)); } catch (_) {} };
+  await Promise.all([lanzar(enWikipedia), lanzar(enDuckDuckGo), lanzar(enMojeek), lanzar(enBing), lanzar(enGoogle)]);
+
+  const vistos = new Set(), porDominio = new Map(), orden = [];
+  for (const r of crudos) {
+    let d; try { d = new URL(r.u).hostname.replace(/^www\./, ""); } catch (_) { continue; }
+    if (vistos.has(r.u) || /(^|\.)(google|bing|duckduckgo|mojeek|startpage)\.[a-z]+$/.test(d)) continue;
+    if ((porDominio.get(d) || 0) >= 2) continue;
+    porDominio.set(d, (porDominio.get(d) || 0) + 1);
+    vistos.add(r.u);
+    orden.push({ t: r.t, u: r.u, x: r.x || "", d, p: puntua({ t: r.t, u: r.u, x: r.x, d }, ts) });
+  }
+  orden.sort((a, b) => b.p - a.p);
+
+  const cuantas = nivel >= 3 ? 6 : nivel === 2 ? 4 : 2;
+  const elegidas = orden.slice(0, cuantas);
+  if (!elegidas.length) { clearTimeout(to); return []; }
+
+  await mapa(elegidas, 3, async f => {
+    try {
+      const h = await baja(f.u, ac.signal, 240000);
+      const e = extrae(h);
+      if (e.titulo) f.t = e.titulo;
+      if (e.texto.length > 200) f.x = e.texto;
+      if (nivel >= 2) f.links = enlacesInternos(h, f.u, ts);
+    } catch (_) {}
+  });
+
+  if (nivel >= 3) {
+    const mejor = elegidas.find(f => (f.x || "").length > 900 && f.links?.length);
+    if (mejor) {
+      await mapa(mejor.links.slice(0, 2), 2, async l => {
+        try {
+          const e = extrae(await baja(l.u, ac.signal, 180000));
+          if (e.texto.length > 400) elegidas.push({ t: e.titulo || l.t, u: l.u, x: e.texto, d: new URL(l.u).hostname });
+        } catch (_) {}
+      });
+    }
+  }
+  clearTimeout(to);
+
+  const out = elegidas.filter(f => (f.x || "").length > 120);
+  alMemo(k, out);
+  return out;
+}
+
+const contexto = f => f.map((x, i) => `[${i + 1}] ${x.t} (${x.d})\n${x.u}\n${x.x.slice(0, 1800)}`).join("\n\n").slice(0, 9000);
+
+
 // Un intento contra un proveedor. Devuelve texto o lanza.
-async function pedir(p, msgs, env, signal, request) {
-  const cuerpo = {
-    messages: [{ role: "system", content: sistema() }, ...msgs],
-    max_tokens: 900,
-    temperature: 0.7,
-    stream: false
-  };
+async function pedir(p, msgs, env, signal, request, extra) {
+  if (p.tipo === "ddg") return ddg(p, msgs, signal);
+
+  // Los modelos de OpenAI (gpt-5-*) piden max_completion_tokens y no aceptan temperature.
+  const cuerpo = p.oai
+    ? { messages: [{ role: "system", content: sistema(extra) }, ...msgs], max_completion_tokens: 900 }
+    : { messages: [{ role: "system", content: sistema(extra) }, ...msgs], max_tokens: 900, temperature: 0.7, stream: false };
 
   if (p.tipo === "cf") {
     if (!env.AI) throw new Error("sin binding AI");
@@ -139,10 +432,13 @@ async function pedir(p, msgs, env, signal, request) {
   const url = new URL(p.url);
   if (p.referrer) url.searchParams.set("referrer", new URL(request.url).origin);
 
+  const cabeceras = { "content-type": "application/json", accept: "application/json", "user-agent": UA };
+  if (p.keyEnv && env[p.keyEnv]) cabeceras.authorization = "Bearer " + env[p.keyEnv];
+
   const r = await fetch(url, {
     method: "POST",
     signal,
-    headers: { "content-type": "application/json", accept: "application/json" },
+    headers: cabeceras,
     body: JSON.stringify(p.modelo ? { ...cuerpo, model: p.modelo } : cuerpo)
   });
   if (!r.ok) throw new Error("HTTP " + r.status);
@@ -159,6 +455,8 @@ function conLimite(ms, fn) {
   return fn(ac.signal).finally(() => clearTimeout(t));
 }
 
+
+// ── Sesión de Firebase (JWT) y límite por persona ────────────────────────────
 let JWKS = null, JWKS_T = 0;
 const jwks = async () => {
   if (JWKS && Date.now() - JWKS_T < 3600e3) return JWKS;
@@ -193,11 +491,31 @@ async function ia(request, env) {
     .map(m => ({ role: m.role, content: m.content.slice(0, 2000) }));
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") return json({ ok: false }, 400);
 
-  // Si hay key de OpenRouter, se usa primero (gratis con modelos ":free").
-  const cadena = env.OPENROUTER_KEY
-    ? [{ id: "openrouter", tipo: "oa", url: "https://openrouter.ai/api/v1/chat/completions",
-         modelo: "deepseek/deepseek-chat-v3.1:free", key: env.OPENROUTER_KEY }, ...PROVEEDORES]
-    : PROVEEDORES;
+  const pregunta = msgs[msgs.length - 1].content;
+  const pideDatos = body.buscar === true ||
+    /\b(hoy|ayer|ahora|actual|actualmente|últim[oa]s?|noticias?|precio|cu[aá]nto (cuesta|sale|vale)|qui[eé]n (gan[oó]|es|fue)|d[oó]nde (est[aá]|queda)|clima|resultado|cotizaci[oó]n|estreno|sali[oó]|2026)\b/i.test(pregunta);
+
+  let fuentes = [], extra = "";
+  if (pideDatos) {
+    const nivel = Math.min(3, Math.max(1, Number(body.profundidad) || 2));
+    try {
+      fuentes = await investigar(pregunta.slice(0, 200), nivel);
+      if (fuentes.length) extra = "Contexto web recuperado ahora mismo. Para datos actuales usa SOLO esto y cita con [n]; si no alcanza, dilo y no inventes:\n\n" + contexto(fuentes);
+    } catch (_) {}
+  }
+
+  const k = clave(msgs) + (pideDatos ? "#w" : "");
+  const guardada = delMemo(k);
+  if (guardada) return json({ ok: true, texto: guardada, cache: true });
+
+  // Llaves opcionales: si existen, van primero; si no, la red gratis de siempre.
+  const cadena = [
+    ...(env.OPENAI_KEY ? [{ id: "gpt5-nano", tipo: "oa", oai: true, url: "https://api.openai.com/v1/chat/completions", modelo: "gpt-5-nano", keyEnv: "OPENAI_KEY" }] : []),
+    ...(env.OPENAI_KEY ? [{ id: "gpt5", tipo: "oa", oai: true, url: "https://api.openai.com/v1/chat/completions", modelo: "gpt-5", keyEnv: "OPENAI_KEY" }] : []),
+    ...(env.POLLEN_KEY ? [{ id: "pollen-gpt54", tipo: "oa", oai: true, url: "https://gen.pollinations.ai/v1/chat/completions", modelo: "openai/gpt-5.4-nano", keyEnv: "POLLEN_KEY" }] : []),
+    ...(env.OPENROUTER_KEY ? [{ id: "openrouter", tipo: "oa", url: "https://openrouter.ai/api/v1/chat/completions", modelo: "openai/gpt-5-nano", keyEnv: "OPENROUTER_KEY" }] : []),
+    ...PROVEEDORES
+  ];
 
   const deadline = Date.now() + 45000;                                          // presupuesto total de la respuesta
   let ultimo = "";
@@ -206,18 +524,12 @@ async function ia(request, env) {
     const resto = deadline - Date.now();
     if (resto < 3000) break;
     try {
-      const texto = await conLimite(Math.min(20000, resto), signal => {
-        if (p.key) {                                                            // OpenRouter sí lleva cabecera
-          const url = new URL(p.url);
-          return fetch(url, {
-            method: "POST", signal,
-            headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + p.key },
-            body: JSON.stringify({ messages: [{ role: "system", content: sistema() }, ...msgs], model: p.modelo, max_tokens: 900, temperature: 0.7 })
-          }).then(r => r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))).then(sacaTexto);
-        }
-        return pedir(p, msgs, env, signal, request);
-      });
-      if (texto) return json({ ok: true, texto: texto.slice(0, 4000) });
+      const texto = await conLimite(Math.min(20000, resto), signal => pedir(p, msgs, env, signal, request, extra));
+      if (texto) {
+        const recorte = texto.slice(0, 4000);
+        alMemo(k, recorte);
+        return json({ ok: true, texto: recorte, fuentes: fuentes.map(f => ({ t: f.t, u: f.u })) });
+      }
       ultimo = p.id + ": respuesta vacía";
     } catch (err) {
       ultimo = p.id + ": " + String((err && err.message) || err);
