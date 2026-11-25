@@ -7,7 +7,7 @@ const PROYECTO = "maxi-bot-b7dfc";
 // Modelos de IA de Cloudflare Workers AI, en orden de preferencia: si uno falla o lo retiran, se prueba el siguiente.
 // (llama-3.1-8b-instruct ya fue retirado el 30/05/2026.) El catálogo cambia: revisa https://developers.cloudflare.com/workers-ai/models/
 const MODELOS = ["@cf/meta/llama-3.1-8b-instruct-fp8", "@cf/meta/llama-3.1-8b-instruct-fast", "@cf/meta/llama-3.2-3b-instruct", "@cf/google/gemma-4-26b-a4b-it"];
-const SISTEMA = "Eres Mambo IA, la asistente de la página Mambo Bot (juegos, misiones, pases, canjes y chats de un bot de WhatsApp). Respondes siempre en español, con un tono amable y cercano, claro y breve (máximo unos 6 párrafos cortos). Si no sabes algo, lo dices. No inventes datos de la cuenta del usuario ni prometas premios. Puedes usar *negrita* y listas con guiones.";
+const SISTEMA = "Eres Mambo IA, un asistente de inteligencia artificial de uso general, como Meta IA o ChatGPT, dentro de la página Mambo Bot. Respondes preguntas de cualquier tema (cultura general, música, juegos, escuela, tecnología, consejos, chistes, redacción, etc.) siempre en español, con un tono amable y cercano, claro y breve (máximo unos 6 párrafos cortos). Solo mencionas la página (juegos, misiones, pases, canjes, chats y el bot de WhatsApp) cuando te pregunten por ella; no la menciones por tu cuenta ni preguntes si quieres jugar. Si no estás seguro de un dato, dilo con honestidad y da lo que sí sepas, sin inventar. No tienes acceso a la cuenta del usuario ni a internet. Puedes usar *negrita* y listas con guiones.";
 
 const json = (o, s = 200, cache = false) => new Response(JSON.stringify(o), {
   status: s,
@@ -136,3 +136,4 @@ export default {
     return env.ASSETS.fetch(request);
   }
 };
+  
