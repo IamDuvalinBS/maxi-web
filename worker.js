@@ -4,10 +4,6 @@
 //    El resto lo sirve la página normal.
 const FIREBASE = "https://maxi-bot-b7dfc.firebaseapp.com";
 const PROYECTO = "maxi-bot-b7dfc";
-// Modelos de IA de Cloudflare Workers AI, en orden de preferencia: si uno falla o lo retiran, se prueba el siguiente.
-// (llama-3.1-8b-instruct ya fue retirado el 30/05/2026.) El catálogo cambia: revisa https://developers.cloudflare.com/workers-ai/models/
-const MODELOS = ["@cf/meta/llama-3.1-8b-instruct-fp8", "@cf/meta/llama-3.1-8b-instruct-fast", "@cf/meta/llama-3.2-3b-instruct", "@cf/google/gemma-4-26b-a4b-it"];
-const SISTEMA = "Eres Mambo IA, un asistente de inteligencia artificial de uso general, como Meta IA o ChatGPT, dentro de la página Mambo Bot. Respondes preguntas de cualquier tema (cultura general, música, juegos, escuela, tecnología, consejos, chistes, redacción, etc.) siempre en español, con un tono amable y cercano, claro y breve (máximo unos 6 párrafos cortos). Solo mencionas la página (juegos, misiones, pases, canjes, chats y el bot de WhatsApp) cuando te pregunten por ella; no la menciones por tu cuenta ni preguntes si quieres jugar. Si no estás seguro de un dato, dilo con honestidad y da lo que sí sepas, sin inventar. No tienes acceso a la cuenta del usuario ni a internet. Puedes usar *negrita* y listas con guiones.";
 
 const json = (o, s = 200, cache = false) => new Response(JSON.stringify(o), {
   status: s,
@@ -78,7 +74,91 @@ async function previa(request, ctx) {
 }
 
 
-// ── IA: solo para personas con sesión iniciada en la página ──
+// ══════════════════════════════════════════════════════════════════════════════
+// IA
+// ══════════════════════════════════════════════════════════════════════════════
+// Cadena de proveedores GRATIS y SIN llaves. Se prueban en orden y gana el
+// primero que conteste bien. Si un modelo desaparece del catálogo, se cae solo
+// y sigue el siguiente: no hay que tocar nada más.
+//
+// Para cambiar de IA: edita esta lista y ya. Nada del resto del archivo está
+// atado a un proveedor concreto, así que el bloque entero se puede copiar tal
+// cual a otro Worker.
+//
+//   tipo "cf"  -> Cloudflare Workers AI (binding env.AI, sin key, cuenta gratis)
+//   tipo "oa"  -> cualquier endpoint compatible con OpenAI (POST, sin key)
+//
+// Si algún día pones una key de OpenRouter en el secreto OPENROUTER_KEY, se
+// añade sola delante con un modelo gratis. Sin key no pasa nada.
+const PROVEEDORES = [
+  { id: "cf-llama4-scout", tipo: "cf", modelo: "@cf/meta/llama-4-scout-17b-16e-instruct" },
+  { id: "cf-gpt-oss-120b", tipo: "cf", modelo: "@cf/openai/gpt-oss-120b" },
+  { id: "cf-llama33-70b", tipo: "cf", modelo: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" },
+  { id: "cf-qwen3-30b", tipo: "cf", modelo: "@cf/qwen/qwen3-30b-a3b-fp8" },
+  { id: "cf-mistral-small", tipo: "cf", modelo: "@cf/mistralai/mistral-small-3.1-24b-instruct" },
+  // Pollinations: sin cuenta y sin key, modelos GPT-class. El parámetro
+  // "referrer" te sube el límite gratuito, por eso se manda el origin.
+  { id: "pollinations-gpt", tipo: "oa", url: "https://text.pollinations.ai/openai", modelo: "openai", referrer: true },
+  { id: "pollinations-gpt-large", tipo: "oa", url: "https://text.pollinations.ai/openai", modelo: "openai-large", referrer: true },
+  // Último recurso: endpoint abierto compatible con OpenAI.
+  { id: "hackclub", tipo: "oa", url: "https://ai.hackclub.com/chat/completions" }
+];
+
+// Catálogo de Workers AI: https://developers.cloudflare.com/workers-ai/models/
+
+const sistema = () =>
+  "Eres Mambo IA, un asistente de inteligencia artificial de uso general, como Meta IA o ChatGPT, dentro de la página Mambo Bot. " +
+  "Respondes preguntas de cualquier tema (cultura general, música, juegos, escuela, tecnología, consejos, chistes, redacción, etc.) " +
+  "siempre en español, con un tono amable y cercano, claro y breve (máximo unos 6 párrafos cortos). " +
+  "Hoy es " + new Date().toISOString().slice(0, 10) + "; úsalo solo si viene al caso. " +
+  "Solo mencionas la página (juegos, misiones, pases, canjes, chats y el bot de WhatsApp) cuando te pregunten por ella; " +
+  "no la menciones por tu cuenta ni preguntes si quieres jugar. " +
+  "Si no estás seguro de un dato, dilo con honestidad y da lo que sí sepas, sin inventar. " +
+  "No tienes acceso a la cuenta del usuario ni a internet. Puedes usar *negrita* y listas con guiones.";
+
+const sacaTexto = r => String(
+  (r && (r.response || r.result ||
+    (r.choices && r.choices[0] && r.choices[0].message &&
+      (r.choices[0].message.content || r.choices[0].message.reasoning_content)))) || ""
+).trim();
+
+// Un intento contra un proveedor. Devuelve texto o lanza.
+async function pedir(p, msgs, env, signal, request) {
+  const cuerpo = {
+    messages: [{ role: "system", content: sistema() }, ...msgs],
+    max_tokens: 900,
+    temperature: 0.7,
+    stream: false
+  };
+
+  if (p.tipo === "cf") {
+    if (!env.AI) throw new Error("sin binding AI");
+    return sacaTexto(await env.AI.run(p.modelo, cuerpo, { signal }));
+  }
+
+  const url = new URL(p.url);
+  if (p.referrer) url.searchParams.set("referrer", new URL(request.url).origin);
+
+  const r = await fetch(url, {
+    method: "POST",
+    signal,
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify(p.modelo ? { ...cuerpo, model: p.modelo } : cuerpo)
+  });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+
+  const ct = r.headers.get("content-type") || "";
+  if (/json/i.test(ct)) return sacaTexto(await r.json());
+  return String(await r.text()).trim();                                        // algunos devuelven texto plano
+}
+
+// Envuelve un intento con su propio reloj y su AbortController.
+function conLimite(ms, fn) {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), ms);
+  return fn(ac.signal).finally(() => clearTimeout(t));
+}
+
 let JWKS = null, JWKS_T = 0;
 const jwks = async () => {
   if (JWKS && Date.now() - JWKS_T < 3600e3) return JWKS;
@@ -106,20 +186,42 @@ async function ia(request, env) {
   const uid = await uidDe(request);
   if (!uid) return json({ ok: false, e: "sesion" }, 401);
   if (!limite(uid)) return json({ ok: false, e: "rapido" }, 429);
-  if (!env.AI) return json({ ok: false, e: "sin-ia" }, 503);
+
   let body; try { body = await request.json(); } catch (_) { return json({ ok: false }, 400); }
   const msgs = (Array.isArray(body.messages) ? body.messages : []).slice(-12)
     .filter(m => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
     .map(m => ({ role: m.role, content: m.content.slice(0, 2000) }));
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") return json({ ok: false }, 400);
+
+  // Si hay key de OpenRouter, se usa primero (gratis con modelos ":free").
+  const cadena = env.OPENROUTER_KEY
+    ? [{ id: "openrouter", tipo: "oa", url: "https://openrouter.ai/api/v1/chat/completions",
+         modelo: "deepseek/deepseek-chat-v3.1:free", key: env.OPENROUTER_KEY }, ...PROVEEDORES]
+    : PROVEEDORES;
+
+  const deadline = Date.now() + 45000;                                          // presupuesto total de la respuesta
   let ultimo = "";
-  for (const modelo of MODELOS) {
+  for (const p of cadena) {
+    if (p.tipo === "cf" && !env.AI) continue;
+    const resto = deadline - Date.now();
+    if (resto < 3000) break;
     try {
-      const r = await env.AI.run(modelo, { messages: [{ role: "system", content: SISTEMA }, ...msgs], max_tokens: 700, temperature: 0.7 });
-      const texto = String((r && (r.response || r.result || (r.choices && r.choices[0] && r.choices[0].message && r.choices[0].message.content))) || "").trim();
+      const texto = await conLimite(Math.min(20000, resto), signal => {
+        if (p.key) {                                                            // OpenRouter sí lleva cabecera
+          const url = new URL(p.url);
+          return fetch(url, {
+            method: "POST", signal,
+            headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + p.key },
+            body: JSON.stringify({ messages: [{ role: "system", content: sistema() }, ...msgs], model: p.modelo, max_tokens: 900, temperature: 0.7 })
+          }).then(r => r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))).then(sacaTexto);
+        }
+        return pedir(p, msgs, env, signal, request);
+      });
       if (texto) return json({ ok: true, texto: texto.slice(0, 4000) });
-      ultimo = modelo + ": respuesta vacía";
-    } catch (err) { ultimo = modelo + ": " + String((err && err.message) || err); }
+      ultimo = p.id + ": respuesta vacía";
+    } catch (err) {
+      ultimo = p.id + ": " + String((err && err.message) || err);
+    }
   }
   return json({ ok: false, e: "ia", d: ultimo.slice(0, 200) }, 503);
 }
@@ -136,4 +238,3 @@ export default {
     return env.ASSETS.fetch(request);
   }
 };
-  
