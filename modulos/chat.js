@@ -3,12 +3,13 @@ let chats = [], unsub = null, msgs = [], curChat = null;
 const waBotMsgs = [];                     // mensajes del chat con el bot: solo en memoria, hasta recargar la página
 let waBotUn = null, waBotUid = null, waBotNuevos = 0;
 const waCopias = new Map(); let waAvisoCopia = false;   // ids de las copias del bot que responden (si hay más de una a la vez, se avisa)
-const waLista = () => otro() === 'bot' ? waBotMsgs : msgs;
+const waLista = () => otro() === 'bot' ? waBotMsgs : msgs.filter(efiVivo);
 const perfs = {}, bgImgs = {};
 perfs.bot = { nombre: 'Mambo Bot', avatar: 'img/logo.jpg' };   // chat con el bot (comandos)
 let botOk = false;
 let oc = { open: false, tab: null, who: 'me' };
-let waResp = null, waEdit = null;                  // responder a un mensaje / editar un mensaje (barra sobre el campo de texto)
+let waResp = null, waEdit = null, efiSeg = 0;     // efiSeg: segundos que duran los mensajes de este chat (0 = no desaparecen)
+const efiVivo = m => !m.exp || m.exp > Date.now();                  // responder a un mensaje / editar un mensaje (barra sobre el campo de texto)
 
 // [clave, nombre, color 1, color 2]  -> "Colores" del chat
 const COLS = [
@@ -243,7 +244,7 @@ function loadChats() {
     await Promise.all(l.map(c => perfOf(c.otro)));          // todos los perfiles a la vez
     const sec = c => (c.ultimo && c.ultimo.t && c.ultimo.t.seconds) || 0;
     l.sort((x, y) => sec(y) - sec(x)); chats = l; if (typeof avChats === 'function') avChats(l, s.metadata.fromCache); if (!location.hash.startsWith('#chat/')) renderSoon();
-  }, e => toast(errMsg(e)));
+  }, e => toast(errMsg(e) + ' [lista de chats]'));
 }
 const chatNuevo = c => {
   if (c.otro === 'bot') return waBotNuevos > 0;
@@ -257,26 +258,23 @@ const horaLista = t => {                                  // hora, "Ayer", día 
   if (dif < 7) return d.toLocaleDateString('es', { weekday: 'short' }).replace(/\.$/, '');
   return d.toLocaleDateString('es', { day: '2-digit', month: '2-digit', year: '2-digit' });
 };
-function chatsView() {
+function chatsLista() {
   const fila = c => {
-    const esBot = c.otro === 'bot', p = perfs[c.otro] || {}, u = c.ultimo || {}, nuevo = chatNuevo(c);
-    const hp = esBot ? '#chat/bot' : '#u/' + esc(c.otro);
+    const p = perfs[c.otro] || {}, u = c.ultimo || {}, nuevo = chatNuevo(c), hp = '#u/' + esc(c.otro);
     const ico = u.tp === 's' ? 'sticker' : u.tp === 'i' ? 'image' : u.tp === 'd' ? 'file' : '';
-    const mio = !esBot && u.de === user.uid ? `<span class="tk${(c.vistos || {})[c.otro] && u.t && u.t.seconds && ((c.vistos[c.otro].seconds || 0) >= u.t.seconds) ? ' v' : ''}">${ic((c.vistos || {})[c.otro] && u.t && u.t.seconds && ((c.vistos[c.otro].seconds || 0) >= u.t.seconds) ? 'check2' : 'check', 14)}</span>` : '';
-    const txt = esBot ? 'Usa los comandos del bot aquí' : u.tp === 's' ? 'Sticker' : u.tp === 'i' ? (u.tx || 'Foto') : u.tp === 'd' ? (u.tx || 'Archivo') : (u.tx || 'Sin mensajes todavía');
-    return `<div class="card chr"><a class="avl" href="${hp}" aria-label="Ver perfil de ${esc(p.nombre)}">${avOf(p, 52, 1)}</a><a class="chm" href="#chat/${esc(c.otro)}"><b>${esc(p.nombre)}</b>${esc_o(c.otro)}<small class="${nuevo ? 'new' : 'mu'}">${esBot ? '' : mio}${ico ? ic(ico, 14) : ''}${esc(txt)}</small></a><span class="chd${nuevo ? ' new' : ''}">${esBot ? '' : horaLista(u.t)}${nuevo ? '<span class="dot" aria-label="Mensaje nuevo"></span>' : ''}</span></div>`;
+    const vi = ((c.vistos || {})[c.otro] || {}).seconds || 0, visto = !!(u.t && u.t.seconds && vi >= u.t.seconds);
+    const mio = u.de === user.uid ? `<span class="tk${visto ? ' v' : ''}">${ic(visto ? 'check2' : 'check', 14)}</span>` : '';
+    const txt = u.tp === 's' ? 'Sticker' : u.tp === 'i' ? (u.tx || 'Foto') : u.tp === 'd' ? (u.tx || 'Archivo') : (u.tx || 'Sin mensajes todavía');
+    return `<div class="card chr" data-n="${esc((p.nombre || '').toLowerCase())}"><a class="avl" href="${hp}" aria-label="Ver perfil de ${esc(p.nombre)}">${avOf(p, 52, 1)}</a><a class="chm" href="#chat/${esc(c.otro)}"><b>${esc(p.nombre)}</b>${esc_o(c.otro)}<small class="${nuevo ? 'new' : 'mu'}">${mio}${ico ? ic(ico, 14) : ''}${esc(txt)}</small></a><span class="chd${nuevo ? ' new' : ''}">${horaLista(u.t)}${nuevo ? '<span class="dot" aria-label="Mensaje nuevo"></span>' : ''}</span></div>`;
   };
-  const botC = chats.find(c => c.otro === 'bot') || { otro: 'bot', miembros: [user.uid, 'bot'] };
   const resto = chats.filter(c => c.otro !== 'bot');
-  return `<div class="ti">${ic('chat', 24)}<span>Chats</span></div>` + (typeof avisosBanner === 'function' ? avisosBanner() : '') + fila(botC) +
-    `<section class="card"><p class="mu">Para agregar a alguien, pídele su ID (lo ve en su perfil).</p><div class="cmp" style="margin-top:12px"><input id="fid" inputmode="numeric" placeholder="ID de tu amigo" aria-label="ID de tu amigo"><button class="snd" data-a="addfriend" aria-label="Agregar amigo">${ic('userplus', 20)}</button></div></section>` +
-    (resto.length ? resto.map(fila).join('') : `<section class="card">${empty('chat', 'No tienes chats con amigos todavía. Agrega a alguien con su ID.')}</section>`);
+  return resto.length ? resto.map(fila).join('') : `<section class="card">${empty('chat', 'Todavía no tienes chats. Toca el botón de abajo para agregar a alguien con su ID.')}</section>`;
 }
 const esc_o = uid => (typeof esOwner === 'function' && esOwner(uid)) ? ' ' + vf() : '';
 function chatView() {
   const p = perfs[otro()], esBot = otro() === 'bot';
   setTimeout(startChat, 0);
-  return `<section class="chatfull" id="cf"><div class="chh"><a href="#chats" class="ib" aria-label="Volver">${ic('back', 26)}</a><a class="avl" href="${perfHref()}" aria-label="Ver perfil">${avOf(p || {}, 44, 1)}</a><a class="chn" href="${perfHref()}"><b>${esc((p && p.nombre) || 'Chat')}${esc_o(otro())}</b><small class="chs" id="chs"></small></a><button class="ib pal" data-a="tema" aria-label="Personalizar chat" style="margin-left:auto">${ic('palette', 28)}</button></div>
+  return `<section class="chatfull" id="cf"><div class="chh"><a href="#chats" class="ib" aria-label="Volver">${ic('back', 26)}</a><a class="avl" href="${perfHref()}" aria-label="Ver perfil">${avOf(p || {}, 44, 1)}</a><a class="chn" href="${perfHref()}"><b>${esc((p && p.nombre) || 'Chat')}${esc_o(otro())}</b><small class="chs" id="chs"></small></a><span class="chx">${esBot ? '' : `<button class="ib" data-a="efim" aria-label="Mensajes temporales">${ic('clock', 26)}</button>`}<button class="ib pal" data-a="tema" aria-label="Personalizar chat">${ic('palette', 28)}</button></span></div>
     <div id="tm" class="opts" hidden></div><div class="mw"><div id="msgs" class="msgs"></div><button id="fab" class="fab" data-a="fabdown" aria-label="Ir al último mensaje" hidden>${ic('chevd', 22)}<span id="fabn" hidden></span></button></div><div id="pan" class="pan" hidden></div>
     <div id="mnp" style="display:none;flex-wrap:wrap;gap:6px;padding:6px 4px"></div>
     ${esBot ? '' : `<div id="atp" class="atp" hidden><button data-a="adg"><span class="atc" style="background:linear-gradient(135deg,#8c5bff,#e040fb)">${ic('image', 22)}</span>Galería</button><button data-a="adf"><span class="atc" style="background:linear-gradient(135deg,#17e4ff,#2a7bff)">${ic('file', 22)}</span>Archivo</button></div>`}
@@ -318,7 +316,7 @@ async function startChat() {
   if (unsub && curChat === o) { pintaOpts(); aplicarChat(); const e = $('#msgs'); if (!e || e._n !== waLista().length) draw(); return; }
   if (o === 'bot' && curChat === o && !unsub) return;      // ya se está preparando
   if (unsub) unsub(); if (chatUn) chatUn();
-  curChat = o; msgs = []; vistoOtro = 0; miVisto = 0; oc = { open: false, tab: null, who: 'me' }; waResp = null; waEdit = null; fabN = 0;
+  curChat = o; msgs = []; vistoOtro = 0; miVisto = 0; oc = { open: false, tab: null, who: 'me' }; waResp = null; waEdit = null; fabN = 0; efiSeg = 0;
   if (o === 'bot') { waStartBot(); return; }
   const cref = db.collection('chats').doc(cidOf(o));
   let primera = true;
@@ -326,9 +324,9 @@ async function startChat() {
     if (!primera) { const el = $('#msgs'); if (el && el._peg === false) for (const ch of s.docChanges()) if (ch.type === 'added' && ch.doc.data().de !== user.uid) fabInc(); }   // mensajes nuevos mientras lees más arriba
     primera = false;
     msgs = s.docs.map(d => ({ ...d.data(), id: d.id, _id: waIdDe(d.id) })); draw(); marcaVisto();
-  }, e => toast(errMsg(e)));
+  }, e => toast(errMsg(e) + ' [mensajes]'));
   // cuándo vio el otro los mensajes (para las palomitas)
-  chatUn = cref.onSnapshot(s => { const v = ((s.data() || {}).vistos || {})[o], n = v && v.seconds ? v.seconds * 1000 : 0; if (n !== vistoOtro) { vistoOtro = n; if (msgs.length) draw(); } }, () => {});
+  chatUn = cref.onSnapshot(s => { const d = s.data() || {}, v = (d.vistos || {})[o], n = v && v.seconds ? v.seconds * 1000 : 0, ef = +d.efi || 0; if (n !== vistoOtro || ef !== efiSeg) { vistoOtro = n; efiSeg = ef; if (msgs.length || ef) draw(); } }, () => {});
   draw(); loadBg(o);
 }
 // ───────── chat con el bot ─────────
@@ -410,13 +408,13 @@ function waEscuchaBot() {
       else { waBotMsgs.push(d); waPinta(d); nuevo = true; if (!waEnChat()) waBotNuevos++; if (typeof avBot === 'function') avBot(d); }
     }
     if (nuevo) { waVisto(); if (!waEnChat() && !location.hash.startsWith('#chat/')) renderSoon(); }
-  }, e => { waBotUn = null; waBotUid = null; toast(errMsg(e)); });
+  }, e => { waBotUn = null; waBotUid = null; toast(errMsg(e) + ' [mensajes del bot]'); });
 }
 async function waStartBot() {
   msgs = waBotMsgs; waBotNuevos = 0;
   draw();                                                 // la pantalla queda lista al instante, con lo que ya había
   unsub = () => {};                                       // la escucha del bot sigue activa mientras la página esté abierta
-  try { await waBotChat(); } catch (e) { unsub = null; curChat = null; toast(errMsg(e)); return; }
+  try { await waBotChat(); } catch (e) { unsub = null; curChat = null; toast(errMsg(e) + ' [abrir chat del bot]'); return; }
   waEscuchaBot();
 }
 async function waEnviarBot(m) {
@@ -435,7 +433,7 @@ async function waEnviarBot(m) {
     try { await manda(); }
     catch (e) { if (doc.qr && e.code === 'permission-denied') { delete doc.qr; delete doc.qt; delete doc.qd; await manda(); } else throw e; }   // si las reglas no aceptan la cita, se manda sin ella
     ref.set({ ping: ts }, { merge: true }).catch(() => {});
-  } catch (e) { toast(errMsg(e)); }
+  } catch (e) { toast(errMsg(e) + ' [enviar al bot]'); }
 }
 // Avisa que ya viste los mensajes del otro
 function marcaVisto() {
@@ -457,6 +455,7 @@ function waVuelca(el, L) {
   if (!L.length) { el.innerHTML = waVacio(); el._hs = []; el._vac = 1; return; }
   if (el._vac) { el.innerHTML = ''; el._vac = 0; el._hs = []; }
   const items = []; let dia = '';
+  if (efiSeg > 0 && otro() !== 'bot') items.push(`<div class="dsep efi"><span>${ic('clock', 12)}Los mensajes desaparecen tras ${efiTxt(efiSeg)}</span></div>`);
   for (const m of L) {
     const k = diaKey(m.t);
     if (k !== dia) { dia = k; items.push(`<div class="dsep"><span>${esc(diaTxt(m.t))}</span></div>`); }
@@ -486,10 +485,16 @@ function chsPinta() {
   const el = $('#chs'); if (!el) return;
   let h;
   if (otro() === 'bot') { const t = botEst && botEst.t && botEst.t.seconds ? botEst.t.seconds * 1000 : 0, vivo = !!(botEst && botEst.enLinea) && Date.now() - t < 180000; h = botEst ? (vivo ? '<i class="on"></i>En línea' : 'Desconectado') : 'Bot de WhatsApp'; }
-  else h = ic('lock', 12) + 'Chat privado';
+  else h = ic('lock', 12) + 'Chat privado' + (efiSeg > 0 ? ' · ' + ic('clock', 12) + efiTxt(efiSeg) : '');
   if (el._h !== h) { el._h = h; el.innerHTML = h; }
 }
 setInterval(chsPinta, 5000);
+const efiBorrados = new Set();
+setInterval(() => {                                       // los mensajes temporales se van solos
+  if (!curChat || curChat === 'bot' || !msgs.some(m => m.exp)) return;
+  const ya = Date.now(); draw();
+  for (const m of msgs) if (m.exp && m.exp <= ya && m.de === user.uid && m.id && !efiBorrados.has(m.id)) { efiBorrados.add(m.id); db.collection('chats').doc(cidOf(curChat)).collection('msgs').doc(m.id).delete().catch(() => {}); }
+}, 20000);
 function draw() {
   const el = $('#msgs'); if (!el) return;
   aplicarChat(); chsPinta(); barraPinta();
@@ -516,10 +521,11 @@ async function enviar(m) {
   for (const k of ['tx', 'src', 'u', 'nm', 'sz', 'w', 'h', 'bid']) if (m[k] != null && m[k] !== '') doc[k] = m[k];
   if (Array.isArray(m.mn) && m.mn.length) doc.mn = m.mn;
   if (q && q.id) { doc.qr = q.id; doc.qt = q.tx; doc.qd = q.de; }
+  if (efiSeg > 0) doc.exp = Date.now() + efiSeg * 1000;   // mensaje temporal
   try {
     await ref.collection('msgs').add(doc);
     await ref.set({ ultimo: { tx: etiquetaUlt(m), tp: m.tp, t: ts, de: user.uid } }, { merge: true });
-  } catch (e) { toast(errMsg(e)); }
+  } catch (e) { toast(errMsg(e) + ' [enviar]'); }
 }
 document.addEventListener('change', async e => {
   if (e.target.id !== 'bgf' || !e.target.files[0]) return;
@@ -576,7 +582,7 @@ MODS.push(async (a, t) => {
       perfs[o] = q.docs[0].data();
       await db.collection('chats').doc(cidOf(o)).set({ miembros: [user.uid, o] }, { merge: true });
       toast('Amigo agregado'); await loadChats(); location.hash = '#chat/' + o;
-    } catch (e) { toast(errMsg(e)); }
+    } catch (e) { toast(errMsg(e) + ' [agregar amigo]'); }
     return true;
   }
   return false;

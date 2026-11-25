@@ -24,7 +24,7 @@ const MIS = [
 (() => { const e = document.createElement('style'); e.textContent = Object.keys(COS).filter(k => COS[k].t === 'marco').map(k => `.mk-${k}{border:3px solid transparent!important;background:linear-gradient(#10141c,#10141c) padding-box,${COS[k].c} border-box!important;box-shadow:0 0 16px -2px #ffffff55}`).join(''); document.head.appendChild(e); })();
 const marcoCls = () => (perfil && perfil.eq && perfil.eq.marco) ? ' mk-' + perfil.eq.marco : '';
 function stats() { perfil = perfil || {}; const s = perfil.stats = perfil.stats || {}; s.min = s.min || 0; s.par = s.par || 0; s.pj = s.pj || {}; s.pp = s.pp || {}; s.ads = s.ads || 0; return s; }
-const guardaPerfil = async d => { try { await db.collection('perfiles').doc(user.uid).set(d, { merge: true }); } catch (e) { toast(errMsg(e)); } };
+const guardaPerfil = async d => { try { await db.collection('perfiles').doc(user.uid).set(d, { merge: true }); } catch (e) { toast(errMsg(e) + ' [guardar perfil]'); } };
 const gStats = () => guardaPerfil({ stats: { ...stats(), ts: firebase.firestore.FieldValue.serverTimestamp() } });
 const cosPrev = id => `<span class="sw2 ${COS[id].t}" style="background:${COS[id].c}"></span>`;
 
