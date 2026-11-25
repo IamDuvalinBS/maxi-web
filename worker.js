@@ -4,8 +4,9 @@
 //    El resto lo sirve la página normal.
 const FIREBASE = "https://maxi-bot-b7dfc.firebaseapp.com";
 const PROYECTO = "maxi-bot-b7dfc";
-// Modelo de IA gratis de Cloudflare Workers AI (cámbialo por "@cf/meta/llama-3.3-70b-instruct-fp8-fast" para respuestas mejores, gasta más del cupo diario)
-const MODELO = "@cf/meta/llama-3.1-8b-instruct";
+// Modelos de IA de Cloudflare Workers AI, en orden de preferencia: si uno falla o lo retiran, se prueba el siguiente.
+// (llama-3.1-8b-instruct ya fue retirado el 30/05/2026.) El catálogo cambia: revisa https://developers.cloudflare.com/workers-ai/models/
+const MODELOS = ["@cf/meta/llama-3.1-8b-instruct-fp8", "@cf/meta/llama-3.1-8b-instruct-fast", "@cf/meta/llama-3.2-3b-instruct", "@cf/google/gemma-4-26b-a4b-it"];
 const SISTEMA = "Eres Mambo IA, la asistente de la página Mambo Bot (juegos, misiones, pases, canjes y chats de un bot de WhatsApp). Respondes siempre en español, con un tono amable y cercano, claro y breve (máximo unos 6 párrafos cortos). Si no sabes algo, lo dices. No inventes datos de la cuenta del usuario ni prometas premios. Puedes usar *negrita* y listas con guiones.";
 
 const json = (o, s = 200, cache = false) => new Response(JSON.stringify(o), {
@@ -111,11 +112,16 @@ async function ia(request, env) {
     .filter(m => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
     .map(m => ({ role: m.role, content: m.content.slice(0, 2000) }));
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") return json({ ok: false }, 400);
-  try {
-    const r = await env.AI.run(MODELO, { messages: [{ role: "system", content: SISTEMA }, ...msgs], max_tokens: 700, temperature: 0.7 });
-    const texto = String((r && (r.response || r.result)) || "").trim();
-    return texto ? json({ ok: true, texto: texto.slice(0, 4000) }) : json({ ok: false, e: "vacio" }, 502);
-  } catch (err) { return json({ ok: false, e: "ia", d: String((err && err.message) || err).slice(0, 160) }, 503); }
+  let ultimo = "";
+  for (const modelo of MODELOS) {
+    try {
+      const r = await env.AI.run(modelo, { messages: [{ role: "system", content: SISTEMA }, ...msgs], max_tokens: 700, temperature: 0.7 });
+      const texto = String((r && (r.response || r.result || (r.choices && r.choices[0] && r.choices[0].message && r.choices[0].message.content))) || "").trim();
+      if (texto) return json({ ok: true, texto: texto.slice(0, 4000) });
+      ultimo = modelo + ": respuesta vacía";
+    } catch (err) { ultimo = modelo + ": " + String((err && err.message) || err); }
+  }
+  return json({ ok: false, e: "ia", d: ultimo.slice(0, 200) }, 503);
 }
 
 export default {
