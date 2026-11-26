@@ -245,7 +245,8 @@ function loadChats() {
     l.forEach(c => { c.otro = c.miembros.find(u => u !== user.uid); });
     await Promise.all(l.map(c => perfOf(c.otro)));          // todos los perfiles a la vez
     const sec = c => (c.ultimo && c.ultimo.t && c.ultimo.t.seconds) || 0;
-    l.sort((x, y) => sec(y) - sec(x)); chats = l; chatsListo = true;
+    l.sort((x, y) => sec(y) - sec(x)); chats = l;
+    const eraListo = chatsListo; chatsListo = true; if (!eraListo && location.hash.startsWith('#chat/') && otro() !== 'bot') startChat();
     if (curChat && curChat !== 'bot' && curCid && cidOf(curChat) !== curCid) { if (unsub) unsub(); if (chatUn) chatUn(); unsub = null; chatUn = null; curChat = null; startChat(); }   // el chat abierto tenía otro id: se vuelve a conectar al correcto
     if (typeof avChats === 'function') avChats(l, s.metadata.fromCache); if (!location.hash.startsWith('#chat/')) renderSoon();
   }, e => toast(errMsg(e) + ' [lista de chats]'));
@@ -317,6 +318,8 @@ async function setCC(patch) {
 let chatUn = null, vistoOtro = 0, miVisto = 0;
 async function startChat() {
   const o = otro(); if (!db || !user || !o) return;
+  // con personas, se espera a que cargue la lista de chats para conocer el id real del chat (si tarda más de 3 s, se intenta igual)
+  if (o !== 'bot' && !chatsListo) { if (!startChat.t) startChat.t = setTimeout(() => { startChat.t = 0; chatsListo = true; startChat(); }, 3000); return; }
   if (unsub && curChat === o) { pintaOpts(); aplicarChat(); const e = $('#msgs'); if (!e || e._n !== waLista().length) draw(); return; }
   if (o === 'bot' && curChat === o && !unsub) return;      // ya se está preparando
   if (unsub) unsub(); if (chatUn) chatUn();
