@@ -80,8 +80,10 @@ function estBody() {
   const otros = Object.keys(EST).filter(u => u !== user.uid).map(u => ({ u, l: EST[u], nuevo: EST[u].some(x => !vis.has(x.id)) }))
     .sort((a, b) => (b.nuevo - a.nuevo) || ((b.l[b.l.length - 1].t ? b.l[b.l.length - 1].t.seconds : 0) - (a.l[a.l.length - 1].t ? a.l[a.l.length - 1].t.seconds : 0)));
   const fila = o => { const p = perfs[o.u] || {}; return `<div class="card chr" data-a="estver" data-u="${esc(o.u)}" role="button" tabindex="0"><span class="sring ${o.nuevo ? 'on' : 'seen'}">${avOf(p, 52)}</span><div class="chm"><b>${esc(p.nombre)}</b><small class="mu">${hace(o.l[o.l.length - 1].t)}</small></div></div>`; };
-  return mio + `<p class="mu sh">Recientes</p>` + (otros.length ? otros.map(fila).join('') : `<section class="card">${empty('eye', 'Cuando tus amigos publiquen estados, los verás aquí. Duran 24 horas.')}</section>`);
+  return mio + `<p class="mu sh">Actualizaciones recientes</p>` + (otros.length ? otros.map(fila).join('') : `<section class="card">${empty('eye', 'Cuando tus amigos publiquen estados, los verás aquí. Duran 24 horas.')}</section>`);
 }
+const FOS = ['var(--fd)', 'Georgia,"Times New Roman",serif', 'ui-monospace,Menlo,Consolas,monospace'];
+if (!IC.more) IC.more = '<circle cx="12" cy="5" r="1.800"/><circle cx="12" cy="12" r="1.800"/><circle cx="12" cy="19" r="1.800"/>';
 function scCierra() { const o = $('#sc'); if (o) o.remove(); sc = null; }
 function scAbre(k) {
   scCierra();
@@ -90,15 +92,19 @@ function scAbre(k) {
     f.onchange = async () => { const a = f.files && f.files[0]; if (!a) return; try { const d = await fotoLista(a); sc = { tp: 'i', ...d }; scPinta(); } catch (e) { toast(e.message || 'No se pudo preparar la foto.'); } };
     f.click(); return;
   }
-  sc = { tp: 't', bg: 0 }; scPinta();
+  sc = { tp: 't', bg: 0, fo: 0 }; scPinta();
 }
+// editor de estado al estilo WhatsApp: botones redondos arriba, comentario abajo, chip de audiencia y botón blanco de enviar
 function scPinta() {
   const o = document.createElement('div'); o.id = 'sc'; o.className = 'sc';
-  o.style.background = sc.tp === 't' ? EBG[sc.bg] : '#07040f';
-  const top = `<div class="adb"><button class="ib" data-a="scx" aria-label="Cancelar">${ic('close', 26)}</button><span class="sp"></span>${sc.tp === 't' ? `<button class="ib" data-a="scbg" aria-label="Cambiar color">${ic('palette', 26)}</button>` : ''}</div>`;
-  o.innerHTML = sc.tp === 't'
-    ? `${top}<div class="scm"><textarea id="sct" maxlength="200" rows="5" placeholder="Escribe tu estado" aria-label="Texto del estado"></textarea></div><button class="snd scs" data-a="scsend" aria-label="Publicar">${ic('send', 22)}</button>`
-    : `${top}<div class="scm"><img src="${esc(sc.src)}" alt="Vista previa"></div><div class="scc"><textarea id="sct" maxlength="120" rows="1" placeholder="Añade un texto…" aria-label="Texto de la foto"></textarea></div><button class="snd scs" data-a="scsend" aria-label="Publicar">${ic('send', 22)}</button>`;
+  const n = chats.filter(c => c.otro !== 'bot').length, aud = `<span class="aud">${ic('eye', 18)}Estado (${n} ${n === 1 ? 'contacto' : 'contactos'})</span>`;
+  const x = `<button class="rb" data-a="scx" aria-label="Cancelar">${ic('close', 24)}</button>`;
+  if (sc.tp === 't') {
+    o.style.background = EBG[sc.bg];
+    o.innerHTML = `<div class="sct">${x}<span class="sp"></span><button class="rb" data-a="scfont" aria-label="Cambiar letra"><b>Aa</b></button><button class="rb" data-a="scbg" aria-label="Cambiar color">${ic('palette', 24)}</button></div><div class="scm"><textarea id="sct" maxlength="200" rows="5" placeholder="Escribe un estado" aria-label="Texto del estado" style="font-family:${FOS[sc.fo]}"></textarea></div><div class="scb">${aud}<button class="snd wh" data-a="scsend" aria-label="Publicar">${ic('send', 22)}</button></div>`;
+  } else {
+    o.innerHTML = `<div class="sct">${x}</div><div class="scm"><img src="${esc(sc.src)}" alt="Vista previa" draggable="false"></div><label class="scc">${ic('image', 22)}<textarea id="sct" maxlength="120" rows="1" placeholder="Añade un comentario…" aria-label="Comentario"></textarea></label><div class="scb">${aud}<button class="snd wh" data-a="scsend" aria-label="Publicar">${ic('send', 22)}</button></div>`;
+  }
   document.body.appendChild(o);
 }
 async function scEnvia() {
@@ -107,30 +113,53 @@ async function scEnvia() {
   if (sc.tp === 't' && !tx) { toast('Escribe algo para tu estado.'); return; }
   const doc = { uid: user.uid, tp: sc.tp, t: firebase.firestore.FieldValue.serverTimestamp(), exp: Date.now() + 864e5 };
   if (tx) doc.tx = tx;
-  if (sc.tp === 't') doc.bg = sc.bg; else { doc.src = sc.src; doc.w = sc.w; doc.h = sc.h; }
+  if (sc.tp === 't') { doc.bg = sc.bg; doc.fo = sc.fo; } else { doc.src = sc.src; doc.w = sc.w; doc.h = sc.h; }
   scCierra();
   try { await db.collection('estados').add(doc); toast('Estado publicado'); } catch (e) { toast(errMsg(e) + ' [estados]'); }
   estLoad();
 }
-function svCierra(rend) { clearTimeout(sv && sv.tm); const o = $('#sv'); if (o) o.remove(); sv = null; if (rend && page() === 'chats') render(); }
+// visor de estados al estilo WhatsApp
+function svCierra(rend) { if (sv) clearTimeout(sv.tm); const o = $('#sv'); if (o) o.remove(); sv = null; if (rend && page() === 'chats') render(); }
 function svAbre(uid) {
   const l = (EST && EST[uid]) || []; if (!l.length) return;
   const vis = eVis(); let i = l.findIndex(x => !vis.has(x.id)); if (i < 0 || uid === user.uid) i = 0;
   svVer(uid, l, i);
 }
 function svVer(uid, l, i) {
-  clearTimeout(sv && sv.tm); const old = $('#sv'); if (old) old.remove();
+  if (sv) clearTimeout(sv.tm); const old = $('#sv'); if (old) old.remove();
   const x = l[i], mio = uid === user.uid, p = mio ? { nombre: 'Mi estado', avatar: foto() } : (perfs[uid] || {});
   eMarca(x.id);
   const dur = x.tp === 'i' ? 6 : 5 + Math.min(5, Math.floor((x.tx || '').length / 60));
   const img = x.tp === 'i' ? waImgSrc(null, x.src) : '';
   const o = document.createElement('div'); o.id = 'sv'; o.className = 'sv';
-  o.innerHTML = `<div class="svp" style="--d:${dur}s">${l.map((_, k) => `<i class="${k < i ? 'f' : k === i ? 'a' : ''}"><b></b></i>`).join('')}</div><div class="svh">${avOf(p, 38)}<div><b>${esc(p.nombre)}</b><small>${hace(x.t)}</small></div><span class="sp"></span>${mio ? `<button class="ib" data-a="svdel" aria-label="Eliminar estado">${ic('trash', 22)}</button>` : ''}<button class="ib" data-a="svx" aria-label="Cerrar">${ic('close', 24)}</button></div><div class="svb"${x.tp === 't' ? ` style="background:${EBG[+x.bg] || EBG[0]}"` : ''}>${img ? `<img src="${esc(img)}" alt="Estado">` : ''}${x.tx ? `<p class="${x.tp === 't' ? 'svt' : 'svc'}">${esc(x.tx)}</p>` : ''}</div><button class="svn l" data-a="svprev" aria-label="Anterior"></button><button class="svn r" data-a="svnext" aria-label="Siguiente"></button>`;
+  o.innerHTML = `<div class="svp" style="--d:${dur}s">${l.map((_, k) => `<i class="${k < i ? 'f' : k === i ? 'a' : ''}"><b></b></i>`).join('')}</div>
+    <div class="svh"><button class="ib" data-a="svx" aria-label="Cerrar">${ic('back', 26)}</button>${avOf(p, 40)}<div class="svw"><b>${esc(p.nombre)}</b><small>${hace(x.t)}</small></div><span class="sp"></span>${mio ? `<button class="ib" data-a="svmenu" aria-label="Más opciones">${ic('more', 24)}</button>` : ''}</div>
+    <div class="svb"${x.tp === 't' ? ` style="background:${EBG[+x.bg] || EBG[0]}"` : ''}>${img ? `<img src="${esc(img)}" alt="Estado" draggable="false">` : ''}${x.tx ? `<p class="${x.tp === 't' ? 'svt' : 'svc'}"${x.tp === 't' ? ` style="font-family:${FOS[+x.fo] || FOS[0]}"` : ''}>${esc(x.tx)}</p>` : ''}</div>
+    <button class="svn l" data-a="svprev" aria-label="Anterior"></button><button class="svn r" data-a="svnext" aria-label="Siguiente"></button>
+    ${mio ? '' : `<div class="svf"><label class="svr"><input id="svr" maxlength="200" placeholder="Responder" autocomplete="off" aria-label="Responder al estado"></label><button class="svk" data-a="svheart" aria-label="Me gusta">${ic('heart', 24)}</button></div>`}`;
   document.body.appendChild(o);
-  sv = { uid, l, i, tm: setTimeout(svSig, dur * 1000) };
+  sv = { uid, l, i, pz: false, fin: Date.now() + dur * 1000, tm: setTimeout(svSig, dur * 1000) };
 }
 function svSig() { if (!sv) return; if (sv.i + 1 < sv.l.length) svVer(sv.uid, sv.l, sv.i + 1); else svCierra(true); }
 function svAnt() { if (!sv) return; svVer(sv.uid, sv.l, Math.max(0, sv.i - 1)); }
+function svPausa(p) {                                       // mantener pulsado o escribir una respuesta detiene el estado
+  if (!sv) return; const bar = document.querySelector('#sv .svp');
+  if (p && !sv.pz) { sv.pz = true; clearTimeout(sv.tm); sv.rest = Math.max(400, sv.fin - Date.now()); if (bar) bar.classList.add('pz'); }
+  else if (!p && sv.pz) { sv.pz = false; sv.fin = Date.now() + sv.rest; sv.tm = setTimeout(svSig, sv.rest); if (bar) bar.classList.remove('pz'); }
+}
+let svH = 0;
+document.addEventListener('pointerdown', e => { if (!sv || !e.target.closest || !e.target.closest('.svn')) return; clearTimeout(svH); svH = setTimeout(() => { if (sv) { sv.hold = true; svPausa(true); } }, 220); });
+const svSuelta = () => { clearTimeout(svH); if (sv && sv.hold) { sv.hold = false; sv.supr = true; if (!(document.activeElement && document.activeElement.id === 'svr')) svPausa(false); } };
+document.addEventListener('pointerup', svSuelta); document.addEventListener('pointercancel', svSuelta);
+document.addEventListener('focusin', e => { if (e.target && e.target.id === 'svr') svPausa(true); });
+document.addEventListener('focusout', e => { if (e.target && e.target.id === 'svr') svPausa(false); });
+async function svManda(tx) {                                // la respuesta llega al chat de esa persona, citando su estado
+  if (!sv || sv.uid === user.uid || !tx) return;
+  const x = sv.l[sv.i], ref = db.collection('chats').doc(cidOf(sv.uid)), ts = firebase.firestore.FieldValue.serverTimestamp();
+  const doc = { de: user.uid, tp: 't', tx, t: ts, qr: 'estado:' + x.id, qt: 'Estado · ' + (x.tx ? x.tx.slice(0, 80) : 'Foto'), qd: sv.uid };
+  try { await ref.collection('msgs').add(doc); await ref.set({ ultimo: { tx, tp: 't', t: ts, de: user.uid } }, { merge: true }); toast('Respuesta enviada'); }
+  catch (e) { toast(errMsg(e) + ' [responder estado]'); }
+}
 
 // ───────── canales (las publicaciones oficiales de los owners) ─────────
 const postsOrd = () => [...posts.filter(p => p.pin), ...posts.filter(p => !p.pin)];
@@ -185,6 +214,7 @@ async function iaEnvia(texto) {
   iaBusy = false; iaSave(); iaPinta();
 }
 document.addEventListener('input', e => { if (e.target && e.target.id === 'iam') autoH(e.target); });
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && e.target.id === 'svr') { e.preventDefault(); const v = e.target.value.trim(); if (v) { e.target.value = ''; e.target.blur(); svManda(v); } } });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter' || !e.target || e.target.id !== 'iam' || e.shiftKey || e.isComposing) return;
   if (window.matchMedia && matchMedia('(pointer:coarse)').matches) return;
@@ -207,8 +237,16 @@ MODS.push(async (a, t) => {
     case 'scbg': if (sc && sc.tp === 't') { sc.bg = (sc.bg + 1) % EBG.length; const o = $('#sc'); if (o) o.style.background = EBG[sc.bg]; } return true;
     case 'scsend': await scEnvia(); return true;
     case 'svx': svCierra(true); return true;
-    case 'svnext': svSig(); return true;
-    case 'svprev': svAnt(); return true;
+    case 'svnext': if (sv && sv.supr) { sv.supr = false; return true; } svSig(); return true;
+    case 'svprev': if (sv && sv.supr) { sv.supr = false; return true; } svAnt(); return true;
+    case 'scfont': if (sc && sc.tp === 't') { sc.fo = (sc.fo + 1) % FOS.length; const t = $('#sct'); if (t) t.style.fontFamily = FOS[sc.fo]; } return true;
+    case 'svmenu': {
+      const m = $('#svm'); if (m) { m.remove(); svPausa(false); return true; }
+      svPausa(true); const o = document.createElement('div'); o.id = 'svm'; o.className = 'svm';
+      o.innerHTML = `<button data-a="svdel">${ic('trash', 20)}<span>Eliminar</span></button>`; const h = document.querySelector('#sv .svh'); if (h) h.appendChild(o); return true;
+    }
+    case 'svheart': await svManda('Le gustó tu estado'); toast('Le diste me gusta'); return true;
+    case 'svrsend': { const i = $('#svr'); if (i && i.value.trim()) { const v = i.value.trim(); i.value = ''; i.blur(); await svManda(v); } return true; }
     case 'svdel': {
       if (!sv || !confirm('¿Eliminar este estado?')) return true;
       const x = sv.l[sv.i]; svCierra(false);

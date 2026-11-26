@@ -217,7 +217,8 @@ MODS.push(async (a, t) => {
     case 'lbclose': lbCierra(); return true;
     case 'rpx': { if (waEdit) { const i = $('#cm'); if (i) { i.value = ''; i.style.height = ''; } } waEdit = null; waResp = null; barraPinta(); return true; }
     case 'qgo': {                                           // tocar la cita lleva al mensaje original
-      const id = t.dataset.q, m = waLista().find(x => x.id === id || x.cl === id || x.ci === id), n = m && document.getElementById('mb' + m._id);
+      const id = t.dataset.q; if (String(id).startsWith('estado:')) return true;
+      const m = waLista().find(x => x.id === id || x.cl === id || x.ci === id), n = m && document.getElementById('mb' + m._id);
       if (!n) { toast('Ese mensaje es más antiguo.'); return true; }
       n.scrollIntoView({ block: 'center', behavior: 'smooth' }); n.classList.remove('flash'); void n.offsetWidth; n.classList.add('flash'); return true;
     }
