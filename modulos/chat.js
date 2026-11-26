@@ -59,7 +59,9 @@ const OPS = [
 const otro = () => location.hash.slice(6);
 const getCC = o => ({ col: 'rosa', bm: 'acento', bt: 'cristal', fp: 'defecto', fi: false, ...(((perfil && perfil.cc) || {})[o] || {}) });
 const bubOf = k => BUB.find(b => b[0] === k) || BUB[0];
-const cidOf = o => o === 'bot' ? user.uid + '_bot' : [user.uid, o].sort().join('_');
+// Id del chat: se usa el que de verdad existe en Firestore (hay chats creados con el orden de los ids al revés); si no existe aún, el ordenado
+let chatsListo = false, curCid = null;
+const cidOf = o => { if (o === 'bot') return user.uid + '_bot'; const c = chats.find(x => x.otro === o && x.id); return c ? c.id : [user.uid, o].sort().join('_'); };
 const perfHref = () => otro() === 'bot' ? '#chat/bot' : '#u/' + esc(otro());
 // ── formato de WhatsApp: *negrita* _cursiva_ ~tachado~ `código` ```bloque``` > cita, listas, enlaces y etiquetas ──
 // urlOk ya existe en iconos.js
@@ -239,11 +241,13 @@ let chatsUnsub = null;
 function loadChats() {
   if (!db || !user || chatsUnsub) return;
   chatsUnsub = db.collection('chats').where('miembros', 'array-contains', user.uid).onSnapshot(async s => {
-    const l = s.docs.map(d => d.data({ serverTimestamps: 'estimate' }));
+    const l = s.docs.map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id }));
     l.forEach(c => { c.otro = c.miembros.find(u => u !== user.uid); });
     await Promise.all(l.map(c => perfOf(c.otro)));          // todos los perfiles a la vez
     const sec = c => (c.ultimo && c.ultimo.t && c.ultimo.t.seconds) || 0;
-    l.sort((x, y) => sec(y) - sec(x)); chats = l; if (typeof avChats === 'function') avChats(l, s.metadata.fromCache); if (!location.hash.startsWith('#chat/')) renderSoon();
+    l.sort((x, y) => sec(y) - sec(x)); chats = l; chatsListo = true;
+    if (curChat && curChat !== 'bot' && curCid && cidOf(curChat) !== curCid) { if (unsub) unsub(); if (chatUn) chatUn(); unsub = null; chatUn = null; curChat = null; startChat(); }   // el chat abierto tenía otro id: se vuelve a conectar al correcto
+    if (typeof avChats === 'function') avChats(l, s.metadata.fromCache); if (!location.hash.startsWith('#chat/')) renderSoon();
   }, e => toast(errMsg(e) + ' [lista de chats]'));
 }
 const chatNuevo = c => {
@@ -318,7 +322,7 @@ async function startChat() {
   if (unsub) unsub(); if (chatUn) chatUn();
   curChat = o; msgs = []; vistoOtro = 0; miVisto = 0; oc = { open: false, tab: null, who: 'me' }; waResp = null; waEdit = null; fabN = 0; efiSeg = 0;
   if (o === 'bot') { waStartBot(); return; }
-  const cref = db.collection('chats').doc(cidOf(o));
+  curCid = cidOf(o); const cref = db.collection('chats').doc(curCid);
   let primera = true;
   unsub = cref.collection('msgs').orderBy('t').limitToLast(60).onSnapshot(s => {
     if (!primera) { const el = $('#msgs'); if (el && el._peg === false) for (const ch of s.docChanges()) if (ch.type === 'added' && ch.doc.data().de !== user.uid) fabInc(); }   // mensajes nuevos mientras lees más arriba
